@@ -24,6 +24,7 @@ import com.google.enterprise.connector.sharepoint.dao.UserGroupMembershipRowMapp
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.AuthType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.Method;
+import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ReadAdGroupsType;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnectionSettings;
 import com.google.enterprise.connector.sharepoint.spiimpl.SPDocument;
 import com.google.enterprise.connector.sharepoint.spiimpl.SharepointConnector;
@@ -706,7 +707,7 @@ public class TestConfiguration {
   public static LdapConnectionSettings getLdapConnetionSettings() {
     LdapConnectionSettings settings = new LdapConnectionSettings(
         Method.STANDARD, "xxx.xxx.xxx.xxx", 389, "DC=gdc-psl,DC=net",
-        AuthType.SIMPLE, "googlesp", "xxxx", "gdc-psl.net");
+        AuthType.SIMPLE, "googlesp", "xxxx", "gdc-psl.net", ReadAdGroupsType.RECURSIVE);
     return settings;
   }
 

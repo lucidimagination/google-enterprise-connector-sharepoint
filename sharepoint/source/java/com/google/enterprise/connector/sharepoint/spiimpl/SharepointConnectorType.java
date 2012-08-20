@@ -24,6 +24,7 @@ import com.google.enterprise.connector.sharepoint.client.SPConstants.SPType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.AuthType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.LdapConnectionError;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.Method;
+import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ReadAdGroupsType;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnection;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnectionSettings;
 import com.google.enterprise.connector.sharepoint.wsclient.GSBulkAuthorizationWS;
@@ -106,6 +107,7 @@ public class SharepointConnectorType implements ConnectorType {
 	private String ldapServerHostAddress;
 	private String portNumber;
 	private String authenticationType;
+  private String readAdGroupsType;
 	private String connectMethod;
 	private String searchBase;
 	private String initialCacheSize;
@@ -352,7 +354,7 @@ public class SharepointConnectorType implements ConnectorType {
 							+ SPConstants.LABEL + SPConstants.CLOSE_ELEMENT);
 					buf.append(SPConstants.BREAK_LINE);
 
-				} else if (collator.equals(key, SPConstants.AUTHENTICATION_TYPE)) {
+				} else if (collator.equals(key, SPConstants.READ_AD_GROUPS_TYPE)) {
 					buf.append(SPConstants.OPEN_ELEMENT + SPConstants.SELECT);
 					appendAttribute(buf, SPConstants.CONFIG_NAME, key);
 					appendAttribute(buf, SPConstants.CONFIG_ID, key);
@@ -368,32 +370,74 @@ public class SharepointConnectorType implements ConnectorType {
 					buf.append(SPConstants.OPEN_ELEMENT + SPConstants.OPTION
 							+ SPConstants.SPACE + SPConstants.VALUE + SPConstants.EQUAL_TO
 							+ "\"");
-					buf.append(SPConstants.AUTHENTICATION_TYPE_SIMPLE);
+					buf.append(SPConstants.READ_AD_GROUPS_TYPE_RECURSIVE);
 					buf.append("\"");
 					if (Strings.isNullOrEmpty(value)
-							|| value.equalsIgnoreCase(SPConstants.AUTHENTICATION_TYPE_SIMPLE)) {
+							|| value.equalsIgnoreCase(SPConstants.READ_AD_GROUPS_TYPE_RECURSIVE)) {
 						buf.append(SPConstants.SPACE + SPConstants.SELECTED
 								+ SPConstants.EQUAL_TO + "\"" + SPConstants.SELECTED + "\"");
 					}
 					buf.append(SPConstants.CLOSE_ELEMENT
-							+ SPConstants.AUTHENTICATION_TYPE_SIMPLE);
+							+ SPConstants.READ_AD_GROUPS_TYPE_RECURSIVE);
 					buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
 							+ SPConstants.CLOSE_ELEMENT);
 					buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT
 							+ SPConstants.OPTION + SPConstants.SPACE + SPConstants.VALUE
 							+ SPConstants.EQUAL_TO + "\"");
-					buf.append(SPConstants.AUTHENTICATION_TYPE_ANONYMOUS);
+					buf.append(SPConstants.READ_AD_GROUPS_TYPE_IN_CHAIN);
 					buf.append("\"");
-					if (value.equalsIgnoreCase(SPConstants.AUTHENTICATION_TYPE_ANONYMOUS)) {
+					if (value.equalsIgnoreCase(SPConstants.READ_AD_GROUPS_TYPE_IN_CHAIN)) {
 						buf.append(SPConstants.SPACE + SPConstants.SELECTED
 								+ SPConstants.EQUAL_TO + "\"" + SPConstants.SELECTED + "\"");
 					}
 					buf.append(SPConstants.CLOSE_ELEMENT
-							+ SPConstants.AUTHENTICATION_TYPE_ANONYMOUS);
+							+ SPConstants.READ_AD_GROUPS_TYPE_IN_CHAIN);
 					buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
 							+ SPConstants.CLOSE_ELEMENT);
 					buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT + "/"
 							+ SPConstants.SELECT + SPConstants.CLOSE_ELEMENT);
+        } else if (collator.equals(key, SPConstants.AUTHENTICATION_TYPE)) {
+          buf.append(SPConstants.OPEN_ELEMENT + SPConstants.SELECT);
+          appendAttribute(buf, SPConstants.CONFIG_NAME, key);
+          appendAttribute(buf, SPConstants.CONFIG_ID, key);
+          buf.append(SPConstants.SPACE + SPConstants.STYLE);
+
+          if (editMode) {
+            if (this.pushAcls.equalsIgnoreCase(SPConstants.OFF)) {
+              buf.append(SPConstants.SPACE + SPConstants.DISABLED
+                  + SPConstants.EQUAL_TO + "\"" + SPConstants.TRUE + "\"");
+            }
+          }
+          buf.append(SPConstants.CLOSE_ELEMENT + SPConstants.NEW_LINE);
+          buf.append(SPConstants.OPEN_ELEMENT + SPConstants.OPTION
+              + SPConstants.SPACE + SPConstants.VALUE + SPConstants.EQUAL_TO
+              + "\"");
+          buf.append(SPConstants.AUTHENTICATION_TYPE_SIMPLE);
+          buf.append("\"");
+          if (Strings.isNullOrEmpty(value)
+              || value.equalsIgnoreCase(SPConstants.AUTHENTICATION_TYPE_SIMPLE)) {
+            buf.append(SPConstants.SPACE + SPConstants.SELECTED
+                + SPConstants.EQUAL_TO + "\"" + SPConstants.SELECTED + "\"");
+          }
+          buf.append(SPConstants.CLOSE_ELEMENT
+              + SPConstants.AUTHENTICATION_TYPE_SIMPLE);
+          buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
+              + SPConstants.CLOSE_ELEMENT);
+          buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT
+              + SPConstants.OPTION + SPConstants.SPACE + SPConstants.VALUE
+              + SPConstants.EQUAL_TO + "\"");
+          buf.append(SPConstants.AUTHENTICATION_TYPE_ANONYMOUS);
+          buf.append("\"");
+          if (value.equalsIgnoreCase(SPConstants.AUTHENTICATION_TYPE_ANONYMOUS)) {
+            buf.append(SPConstants.SPACE + SPConstants.SELECTED
+                + SPConstants.EQUAL_TO + "\"" + SPConstants.SELECTED + "\"");
+          }
+          buf.append(SPConstants.CLOSE_ELEMENT
+              + SPConstants.AUTHENTICATION_TYPE_ANONYMOUS);
+          buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
+              + SPConstants.CLOSE_ELEMENT);
+          buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT + "/"
+              + SPConstants.SELECT + SPConstants.CLOSE_ELEMENT);
 				} else if (collator.equals(key, SPConstants.CONNECT_METHOD)) {
 					buf.append(SPConstants.OPEN_ELEMENT + SPConstants.SELECT);
 					appendAttribute(buf, SPConstants.CONFIG_NAME, key);
@@ -889,6 +933,8 @@ public class SharepointConnectorType implements ConnectorType {
 			this.portNumber = val.trim();
 		} else if (collator.equals(key, SPConstants.SEARCH_BASE)) {
 			this.searchBase = val.trim();
+    } else if (collator.equals(key, SPConstants.READ_AD_GROUPS_TYPE)) {
+      this.readAdGroupsType = val.trim();
 		} else if (collator.equals(key, SPConstants.AUTHENTICATION_TYPE)) {
 			this.authenticationType = val.trim();
 		} else if (collator.equals(key, SPConstants.CONNECT_METHOD)) {
@@ -1285,6 +1331,7 @@ public class SharepointConnectorType implements ConnectorType {
 					+ "\r\n document.getElementById(\"usernameFormatInAce\").disabled=false"
 					+ "\r\n document.getElementById(\"searchBase\").disabled=false"
 					+ "\r\n document.getElementById(\"authenticationType\").disabled=false"
+          + "\r\n document.getElementById(\"readAdGroupsType\").disabled=false"
 					+ "\r\n document.getElementById(\"connectMethod\").disabled=false"
 					+ "\r\n document.getElementById(\"useCacheToStoreLdapUserGroupsMembership\").disabled=false"
 					+ "\r\n document.getElementById(\"appendNamespaceInSPGroup\").checked=true"
@@ -1300,6 +1347,7 @@ public class SharepointConnectorType implements ConnectorType {
 					+ "\r\n document.getElementById(\"usernameFormatInAce\").disabled=true"
 					+ "\r\n document.getElementById(\"searchBase\").disabled=true"
 					+ "\r\n document.getElementById(\"authenticationType\").disabled=true"
+          + "\r\n document.getElementById(\"readAdGroupsType\").disabled=true"
 					+ "\r\n document.getElementById(\"connectMethod\").disabled=true"
 					+ "\r\n document.getElementById(\"useCacheToStoreLdapUserGroupsMembership\").disabled=true"
 					+ "\r\n document.getElementById(\"cacheRefreshInterval\").disabled=true"
@@ -1933,10 +1981,18 @@ public class SharepointConnectorType implements ConnectorType {
 					} else {
 						authType = AuthType.SIMPLE;
 					}
+					
+			    ReadAdGroupsType readAdGroupsType;
+			    if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+			      readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+			    } else {
+			      readAdGroupsType = ReadAdGroupsType.RECURSIVE;
+			    }
+					
 					LdapConnectionSettings settings = new LdapConnectionSettings(method,
 							this.ldapServerHostAddress, Integer.parseInt(this.portNumber),
 							this.searchBase, authType, this.username, this.password,
-							this.domain);
+							this.domain, readAdGroupsType);
 					LOGGER.config("Created LDAP connection settings object to obtain LDAP context "
 							+ ldapConnectionSettings);
 					LdapConnection ldapConnection = new LdapConnection(settings);
@@ -2061,7 +2117,7 @@ public class SharepointConnectorType implements ConnectorType {
 		return false;
 	}
 
-	/**
+  /**
 	 * Checks if the given name consist of special characters or not and returns
 	 * true if there is no special characters found in the given name.
 	 * 

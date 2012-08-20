@@ -22,6 +22,7 @@
     <property name="authenticationType" value="${authenticationType}"/>
     <property name="connectMethod" value="${connectMethod}"/>
     <property name="searchBase" value="${searchBase}"/>
+    <property name="readAdGroupsType" value="${readAdGroupsType}"/>
     <property name="useCacheToStoreLdapUserGroupsMembership" value="${useCacheToStoreLdapUserGroupsMembership}"/>
     <property name="initialCacheSize" value="${initialCacheSize}"/>
     <property name="cacheRefreshInterval" value="${cacheRefreshInterval}"/>
@@ -126,6 +127,7 @@
                 <prop key="ldapServerHostAddress"></prop>
                 <prop key="portNumber"></prop>
                 <prop key="authenticationType"></prop>
+                <prop key="readAdGroupsType"></prop>
                 <prop key="connectMethod"></prop>
                 <prop key="searchBase"></prop>
                 <prop key="useCacheToStoreLdapUserGroupsMembership">false</prop>

@@ -25,6 +25,7 @@ import com.google.enterprise.connector.sharepoint.dao.UserGroupMembership;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.AuthType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.LdapConnectionError;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.Method;
+import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ReadAdGroupsType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ServerType;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnection;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnectionSettings;
@@ -298,10 +299,11 @@ public class UserGroupsService implements LdapService {
 		private final Method connectMethod;
 		private final String baseDN;
 		private final ServerType serverType;
+		private final ReadAdGroupsType readAdGroupsType;
 
 		public LdapConnectionSettings(Method connectMethod, String hostname,
 				int port, String baseDN, AuthType authType, String userName,
-				String password, String domainName) {
+				String password, String domainName, ReadAdGroupsType readAdGroupsType) {
 			this.authType = authType;
 			this.baseDN = baseDN;
 			this.connectMethod = connectMethod;
@@ -311,10 +313,11 @@ public class UserGroupsService implements LdapService {
 			this.serverType = ServerType.getDefault();
 			this.userName = userName;
 			this.domainName = domainName;
+			this.readAdGroupsType = readAdGroupsType;
 		}
 
 		public LdapConnectionSettings(Method standard, String hostName, int port,
-				String baseDN, String domainName) {
+				String baseDN, String domainName, ReadAdGroupsType readAdGroupsType) {
 			this.authType = AuthType.ANONYMOUS;
 			this.baseDN = baseDN;
 			this.connectMethod = standard;
@@ -324,6 +327,7 @@ public class UserGroupsService implements LdapService {
 			this.serverType = ServerType.getDefault();
 			this.userName = null;
 			this.domainName = domainName;
+			this.readAdGroupsType = readAdGroupsType;
 		}
 
 		@Override
@@ -340,14 +344,18 @@ public class UserGroupsService implements LdapService {
 					+ baseDN + ", connectMethod=" + connectMethod + ", hostname="
 					+ hostName + ", password=" + displayPassword + ", port=" + port
 					+ ", serverType=" + serverType + ", userName=" + userName
-					+ ", domainName =" + domainName + " ]";
+					+ ", domainName =" + domainName + ", readAdGroupsType=" + readAdGroupsType + " ]";
 		}
 
 		public AuthType getAuthType() {
 			return authType;
 		}
+		
+		public ReadAdGroupsType getReadAdGroupsType() {
+      return readAdGroupsType;
+    }
 
-		public String getBaseDN() {
+    public String getBaseDN() {
 			return baseDN;
 		}
 
@@ -448,6 +456,60 @@ public class UserGroupsService implements LdapService {
 		}
 		return primaryGroupDN;
 	}
+	
+	Set<String> getAllGroupsUsingInChainLdapQuery(String dn) {
+    // Create the search controls.
+    SearchControls searchCtls = makeSearchCtls(new String[]{
+      LdapConstants.ATTRIBUTE_DN,
+      LdapConstants.ATTRIBUTE_SAMACCOUNTNAME
+    });
+    // Create the search filter.
+    String searchFilter = createSearchFilterForInChainQuery(dn);
+    // Specify the Base DN for the search.
+    String searchBase = ldapConnectionSettings.getBaseDN();
+    
+    Set<String> result = new HashSet<String>();
+    NamingEnumeration<SearchResult> ldapResults = null;
+    try {
+      ldapResults = this.context.search(searchBase, searchFilter, searchCtls);
+      // Loop through the search results
+      while (ldapResults.hasMoreElements()) {
+        SearchResult sr = ldapResults.next();
+        Attributes attrs = sr.getAttributes();
+        if (attrs != null) {
+          try {
+            for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
+              Attribute attr = ae.next();
+              if (attr.getID().equals(LdapConstants.ATTRIBUTE_DN)){
+                result.add( (String) attr.get(0) );
+              } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_SAMACCOUNTNAME)){
+                // TODO: fetch sAMAccountName using this query, no need to do another query for this
+              } else {
+                // log warn?
+              }
+            }
+          } catch (NamingException e) {
+            LOGGER.log(Level.WARNING, "Exception while retrieving all groups for the search user using IN_CHAIN rule ["
+              + dn + "]", e);
+          }
+        }
+      }
+    } catch (NamingException ne) {
+      LOGGER.log(Level.WARNING, "Failed to retrieve all groups for the user name using IN_CHAIN rule: ["
+          + dn + "]", ne);
+    } finally {
+      if (null != ldapResults) {
+        try {
+          ldapResults.close();
+        } catch (NamingException e) {
+          LOGGER.log(Level.WARNING, "Exception during clean up of ldap results for the search user : "
+              + dn, e);
+        }
+      }
+    }
+    
+    return result;
+	}
 
 	/**
 	 * Returns a set of all direct groups that the search user belongs to.
@@ -455,9 +517,10 @@ public class UserGroupsService implements LdapService {
 	 * @param userName search user name
 	 * @return a set of direct groups that the user belongs to in AD.
 	 */
-	Set<String> getDirectGroupsForTheSearchUser(String userName) {
+	Set<String> getDirectGroupsForTheSearchUser(String userName, ReadAdGroupsType readAdGroupsType, StringBuffer dn) {
 		// Create the search controls.
 		SearchControls searchCtls = makeSearchCtls(new String[]{
+	    LdapConstants.ATTRIBUTE_DN,
 			LdapConstants.ATTRIBUTE_MEMBER_OF,
 			LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID,
 			LdapConstants.ATTRIBUTE_OBJECTSID
@@ -470,7 +533,7 @@ public class UserGroupsService implements LdapService {
 		Set<String> directGroups = new HashSet<String>();
 		NamingEnumeration<SearchResult> ldapResults = null;
 		byte[] userSid = null;
-		String primaryGroupId = null; 
+		String primaryGroupId = null;
 		try {
 			ldapResults = this.context.search(searchBase, searchFilter, searchCtls);
 			// Loop through the search results
@@ -481,7 +544,9 @@ public class UserGroupsService implements LdapService {
 					try {
 						for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
 							Attribute attr = ae.next();
-							if (attr.getID().equals(LdapConstants.ATTRIBUTE_OBJECTSID)){
+              if (attr.getID().equals(LdapConstants.ATTRIBUTE_DN)){
+                dn.append( (String) attr.get(0) );
+              } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_OBJECTSID)){
 								userSid = (byte[])attr.get(0);
 							} else if (attr.getID().equals(LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID)) {
 								primaryGroupId = (String)attr.get(0);
@@ -534,6 +599,15 @@ public class UserGroupsService implements LdapService {
 		return filter.toString();
 	}
 
+  private String createSearchFilterForInChainQuery(String dn) {
+    StringBuffer filter;
+    filter = new StringBuffer().append(LdapConstants.LDAP_MATCHING_RULE_IN_CHAIN
+        + ldapEscape(dn) + ")");
+    LOGGER.config("search filter value for fetching all groups using in_chain AD query:" + filter);
+    return filter.toString();
+  }
+
+  
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -651,18 +725,31 @@ public class UserGroupsService implements LdapService {
 		// object on demand.
 		this.context = new LdapConnection(
 				sharepointClientContext.getLdapConnectionSettings()).createContext();
-		directGroups = getDirectGroupsForTheSearchUser(userName);
-		for (String groupName : directGroups) {
-			getAllParentGroups(groupName, ldapGroups);
-		}
-		LOGGER.info("[ " + userName + " ] is a direct or indirect member of "
-				+ ldapGroups.size() + " groups");
-		Set<String> groupNames = getSAMAccountNames(ldapGroups);
-		if (null != directGroups) {
-			directGroups = null;
-			this.context = null;
-		}
-		return groupNames;
+		
+    StringBuffer dn = new StringBuffer("");
+		directGroups = getDirectGroupsForTheSearchUser(userName, sharepointClientContext.getLdapConnectionSettings().getReadAdGroupsType(), dn);
+
+    if (sharepointClientContext.getLdapConnectionSettings().getReadAdGroupsType() == ReadAdGroupsType.IN_CHAIN) {
+      // using IN_CHAIN rule to get all AD groups in a single query
+      for (String groupName : directGroups) {
+        if (!Strings.isNullOrEmpty(groupName)) {
+          ldapGroups.add(groupName);
+        }
+      }
+      if (!Strings.isNullOrEmpty(dn.toString())) {
+        ldapGroups.addAll( getAllGroupsUsingInChainLdapQuery(dn.toString()) );
+      }
+      
+    } else {
+      // _recursively_ retrieve all the groups
+      for (String groupName : directGroups) {
+        getAllParentGroups(groupName, ldapGroups);
+      }
+    }
+    LOGGER.info("[ " + userName + " ] is a direct or indirect member of "
+        + ldapGroups.size() + " groups");
+    Set<String> groupNames = getSAMAccountNames(ldapGroups);
+    return groupNames;
 	}
 
 	/**

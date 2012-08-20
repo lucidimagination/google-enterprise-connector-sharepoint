@@ -194,11 +194,16 @@ public class UserGroupsServiceTest {
 	}
 	
 	@Test
+	/* WTF? Is this stuff really tested? 
+	 * There's no getGroupDNForTheGroup anymore and it seems DN -> sAMAccountName resolution works via batched getSAMAccountNames
+	 */
+	/*
 	public void testGetGroupDNForTheGroup() {
 		assertEquals("Domain Users", this.userGroupsService.getGroupDNForTheGroup("CN=Domain Users,CN=Users,DC=example,DC=com"));
 		assertEquals("Group, Name (Comment)", this.userGroupsService.getGroupDNForTheGroup("CN=Group\\, Name (Comment),CN=Users,DC=example,DC=com"));
 		assertEquals("no comma", this.userGroupsService.getGroupDNForTheGroup("no comma"));
 	}
+	*/
 
 	/**
 	 * @throws java.lang.Exception

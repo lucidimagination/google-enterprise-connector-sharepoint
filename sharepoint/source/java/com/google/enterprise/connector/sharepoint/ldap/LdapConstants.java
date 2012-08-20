@@ -27,10 +27,13 @@ public class LdapConstants {
   public static final String PREFIX_FOR_PRIMARY_GROUP_FILTER = "(objectSid=";
   public static final String PREFIX_FOR_GROUP_FILTER = "(distinguishedName=";
   public static final String ATTRIBUTE_MEMBER_OF = "memberOf";
+  public static final String ATTRIBUTE_DN = "distinguishedName";
   public static final String ATTRIBUTE_PRIMARY_GROUP_ID = "primaryGroupID";
   public static final String ATTRIBUTE_OBJECTSID = "objectSid;binary";
   public static final String ATTRIBUTE_SAMACCOUNTNAME = "sAMAccountName";
   public static final String ESCAPE_CHARACTERS = "\\*()\0/";
+  
+  public static final String LDAP_MATCHING_RULE_IN_CHAIN = "(member:1.2.840.113556.1.4.1941:=";
 
   public static final int DEFAULT_PORT = 389;
 
@@ -66,6 +69,13 @@ public class LdapConstants {
       } else {
         return SPConstants.AUTHENTICATION_TYPE_SIMPLE;
       }
+    }
+  }
+
+  public enum ReadAdGroupsType {
+    RECURSIVE, IN_CHAIN;
+    static ReadAdGroupsType getDefault() {
+      return RECURSIVE;
     }
   }
 

@@ -26,6 +26,7 @@
         <value>searchBase</value>
         <value>authenticationType</value>
         <value>connectMethod</value>
+        <value>readAdGroupsType</value>
         <!--  LDAP user groups membership cache settings -->
         <value>useCacheToStoreLdapUserGroupsMembership</value>
         <value>initialCacheSize</value>

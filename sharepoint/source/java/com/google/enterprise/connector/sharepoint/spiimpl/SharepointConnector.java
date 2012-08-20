@@ -25,6 +25,7 @@ import com.google.enterprise.connector.sharepoint.dao.UserDataStoreDAO;
 import com.google.enterprise.connector.sharepoint.dao.UserGroupMembershipRowMapper;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.AuthType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.Method;
+import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ReadAdGroupsType;
 import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnectionSettings;
 import com.google.enterprise.connector.sharepoint.wsclient.GssAclWS;
 import com.google.enterprise.connector.spi.Connector;
@@ -86,6 +87,7 @@ public class SharepointConnector implements Connector,
 	private String authenticationType;
 	private String connectMethod;
 	private String searchBase;
+	private String readAdGroupsType;
 	private String initialCacheSize;
 	private boolean useCacheToStoreLdapUserGroupsMembership;
 	private String cacheRefreshInterval;
@@ -319,7 +321,7 @@ public class SharepointConnector implements Connector,
 				+ ldapServerHostAddress + "], portNumber = [" + portNumber
 				+ "], authenticationType = [" + authenticationType
 				+ "], connectMethod = [" + connectMethod + "], searchBase = ["
-				+ searchBase + " ]" + "], feedUnPublishedDocuments = ["
+				+ searchBase + " ], readAdGroupsType = [" + readAdGroupsType + "] , feedUnPublishedDocuments = ["
 				+ feedUnPublishedDocuments + "]");
 
 		sharepointClientContext = new SharepointClientContext(sharepointUrl,
@@ -571,8 +573,22 @@ public class SharepointConnector implements Connector,
 	public void setAuthenticationType(String authenticationType) {
 		this.authenticationType = authenticationType;
 	}
+	
+	public String getReadAdGroupsType() {
+	  ReadAdGroupsType readAdGroupsType;
+    if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+      readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+    } else {
+      readAdGroupsType = ReadAdGroupsType.RECURSIVE;
+    }
+    return readAdGroupsType.toString();
+  }
 
-	/**
+  public void setReadAdGroupsType(String readAdGroupsType) {
+    this.readAdGroupsType = readAdGroupsType;
+  }
+
+  /**
 	 * @return LDAP directory server connect method.
 	 */
 	public String getConnectMethod() {
@@ -605,8 +621,8 @@ public class SharepointConnector implements Connector,
 	public void setSearchBase(String searchBase) {
 		this.searchBase = searchBase;
 	}
-
-	/**
+	
+  /**
 	 * @return LDAP user groups initial cache size.
 	 */
 	public String getInitialCacheSize() {
@@ -666,9 +682,15 @@ public class SharepointConnector implements Connector,
 		} else {
 			method = Method.STANDARD;
 		}
+    ReadAdGroupsType readAdGroupsType;
+    if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+      readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+    } else {
+      readAdGroupsType = ReadAdGroupsType.RECURSIVE;
+    }
 		LdapConnectionSettings ldapConnectionSettings = new LdapConnectionSettings(
 				method, this.ldapServerHostAddress, Integer.parseInt(this.portNumber),
-				this.searchBase, authType, this.username, this.password, this.domain);
+				this.searchBase, authType, this.username, this.password, this.domain, readAdGroupsType);
 		this.ldapConnectionSettings = ldapConnectionSettings;
 		return ldapConnectionSettings;
 	}
