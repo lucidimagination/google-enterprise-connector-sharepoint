@@ -1,0 +1,5 @@
+/bin/
+/build/
+/source/java/com/google/enterprise/connector/sharepoint/generated/
+.project
+.classpath
