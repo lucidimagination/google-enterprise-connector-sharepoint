@@ -1,5 +1,5 @@
-/bin/
-/build/
-/source/java/com/google/enterprise/connector/sharepoint/generated/
+/sharepoint/bin/
+/sharepoint/build/
+/sharepoint/source/java/com/google/enterprise/connector/sharepoint/generated/
 .project
 .classpath
