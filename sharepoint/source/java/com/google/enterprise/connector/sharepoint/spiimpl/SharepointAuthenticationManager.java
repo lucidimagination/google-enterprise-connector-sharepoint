@@ -45,7 +45,7 @@ import java.util.logging.Logger;
  * @author nitendra_thakur
  */
 public class SharepointAuthenticationManager implements AuthenticationManager {
-	Logger LOGGER = Logger.getLogger(SharepointAuthenticationManager.class.getName());
+  Logger LOGGER = Logger.getLogger(SharepointAuthenticationManager.class.getName());
 
 	SharepointClientContext sharepointClientContext = null;
 	LdapService ldapService = null;
@@ -171,8 +171,7 @@ public class SharepointAuthenticationManager implements AuthenticationManager {
 			LOGGER.info(buf.toString());
 			return new AuthenticationResponse(true, "", allSearchUserGroups);
 		}
-		LOGGER.info("Group resolution service returned no groups for the search user: "
-				+ searchUser);
+		LOGGER.info("Group resolution service returned no groups for the search user: " + searchUser);
 		// Should returns true with null groups.
 		return new AuthenticationResponse(true, "", null);
 	}

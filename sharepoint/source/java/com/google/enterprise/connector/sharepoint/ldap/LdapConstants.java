@@ -26,8 +26,10 @@ public class LdapConstants {
   public static final Object PREFIX_FOR_DIRECT_GROUPS_FILTER = "(&(objectClass=user)(sAMAccountName=";
   public static final String PREFIX_FOR_PRIMARY_GROUP_FILTER = "(objectSid=";
   public static final String PREFIX_FOR_GROUP_FILTER = "(distinguishedName=";
+  public static final String USER_SEARCH_FILTER = "(objectClass=user)";
   public static final String ATTRIBUTE_MEMBER_OF = "memberOf";
   public static final String ATTRIBUTE_DN = "distinguishedName";
+  public static final String ATTRIBUTE_TOKEN_GROUPS = "tokenGroups;binary";
   public static final String ATTRIBUTE_PRIMARY_GROUP_ID = "primaryGroupID";
   public static final String ATTRIBUTE_OBJECTSID = "objectSid;binary";
   public static final String ATTRIBUTE_SAMACCOUNTNAME = "sAMAccountName";
@@ -73,7 +75,7 @@ public class LdapConstants {
   }
 
   public enum ReadAdGroupsType {
-    RECURSIVE, IN_CHAIN;
+    RECURSIVE, IN_CHAIN, TOKEN_GROUPS;
     static ReadAdGroupsType getDefault() {
       return RECURSIVE;
     }

@@ -578,6 +578,8 @@ public class SharepointConnector implements Connector,
 	  ReadAdGroupsType readAdGroupsType;
     if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
       readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+    } else if (ReadAdGroupsType.TOKEN_GROUPS.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+      readAdGroupsType = ReadAdGroupsType.TOKEN_GROUPS;
     } else {
       readAdGroupsType = ReadAdGroupsType.RECURSIVE;
     }
@@ -685,6 +687,8 @@ public class SharepointConnector implements Connector,
     ReadAdGroupsType readAdGroupsType;
     if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
       readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+    } else if (ReadAdGroupsType.TOKEN_GROUPS.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+      readAdGroupsType = ReadAdGroupsType.TOKEN_GROUPS;
     } else {
       readAdGroupsType = ReadAdGroupsType.RECURSIVE;
     }

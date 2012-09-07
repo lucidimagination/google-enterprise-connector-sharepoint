@@ -110,6 +110,7 @@ public class UserDataStoreDAO extends SimpleSharePointDAO {
    */
   public List<UserGroupMembership> getAllMembershipsForSearchUserAndLdapGroups(
       Set<String> groups, String searchUser) throws SharepointException {
+    long startTime = System.currentTimeMillis();
     Set<String> ldapGroups = null;
     Query query = Query.UDS_SELECT_FOR_ADGROUPS;
     Map<String, Object> groupsObject = new HashMap<String, Object>();
@@ -129,8 +130,10 @@ public class UserDataStoreDAO extends SimpleSharePointDAO {
           "Query execution failed while getting the membership info of a given user and AD gruops.",
           t);
     }
-    LOGGER.log(Level.INFO, memberships.size()
-        + " Memberships identified for LDAP directory groups in User Data Store.");
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, (memberships == null ? 0 : memberships.size())
+         + " Memberships identified for LDAP directory groups in User Data Store "
+         + "in " + (endTime - startTime) + " ms : " + memberships.toString());
     if (null == groups) {
       ldapGroups.remove(searchUser);
       ldapGroups = null;

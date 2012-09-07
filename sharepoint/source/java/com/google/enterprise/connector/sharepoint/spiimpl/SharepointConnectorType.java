@@ -394,6 +394,19 @@ public class SharepointConnectorType implements ConnectorType {
 							+ SPConstants.READ_AD_GROUPS_TYPE_IN_CHAIN);
 					buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
 							+ SPConstants.CLOSE_ELEMENT);
+          buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT
+              + SPConstants.OPTION + SPConstants.SPACE + SPConstants.VALUE
+              + SPConstants.EQUAL_TO + "\"");
+          buf.append(SPConstants.READ_AD_GROUPS_TYPE_TOKEN_GROUPS);
+          buf.append("\"");
+          if (value.equalsIgnoreCase(SPConstants.READ_AD_GROUPS_TYPE_TOKEN_GROUPS)) {
+            buf.append(SPConstants.SPACE + SPConstants.SELECTED
+                + SPConstants.EQUAL_TO + "\"" + SPConstants.SELECTED + "\"");
+          }
+          buf.append(SPConstants.CLOSE_ELEMENT
+              + SPConstants.READ_AD_GROUPS_TYPE_TOKEN_GROUPS);
+          buf.append(SPConstants.OPEN_ELEMENT + "/" + SPConstants.OPTION
+              + SPConstants.CLOSE_ELEMENT);
 					buf.append(SPConstants.NEW_LINE + SPConstants.OPEN_ELEMENT + "/"
 							+ SPConstants.SELECT + SPConstants.CLOSE_ELEMENT);
         } else if (collator.equals(key, SPConstants.AUTHENTICATION_TYPE)) {
@@ -1985,6 +1998,8 @@ public class SharepointConnectorType implements ConnectorType {
 			    ReadAdGroupsType readAdGroupsType;
 			    if (ReadAdGroupsType.IN_CHAIN.toString().equalsIgnoreCase(this.readAdGroupsType)) {
 			      readAdGroupsType = ReadAdGroupsType.IN_CHAIN;
+			    } else if (ReadAdGroupsType.TOKEN_GROUPS.toString().equalsIgnoreCase(this.readAdGroupsType)) {
+            readAdGroupsType = ReadAdGroupsType.TOKEN_GROUPS;
 			    } else {
 			      readAdGroupsType = ReadAdGroupsType.RECURSIVE;
 			    }

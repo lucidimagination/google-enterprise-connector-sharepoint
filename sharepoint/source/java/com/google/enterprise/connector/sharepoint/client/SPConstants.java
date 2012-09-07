@@ -450,6 +450,7 @@ public class SPConstants {
   public static final String READ_AD_GROUPS_TYPE = "readAdGroupsType";
   public static final String READ_AD_GROUPS_TYPE_RECURSIVE = "RECURSIVE";
   public static final String READ_AD_GROUPS_TYPE_IN_CHAIN = "IN_CHAIN";
+  public static final String READ_AD_GROUPS_TYPE_TOKEN_GROUPS = "TOKEN_GROUPS";
 
   public static final String CHECKPOINT_VALUE = "SharePoint";
   public static final int MAX_PORT_VALUE = 65535;

@@ -27,11 +27,11 @@ import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.LdapConnect
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.Method;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ReadAdGroupsType;
 import com.google.enterprise.connector.sharepoint.ldap.LdapConstants.ServerType;
-import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnection;
-import com.google.enterprise.connector.sharepoint.ldap.UserGroupsService.LdapConnectionSettings;
 import com.google.enterprise.connector.sharepoint.spiimpl.SharepointAuthenticationManager;
 import com.google.enterprise.connector.sharepoint.spiimpl.SharepointException;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
@@ -418,21 +418,58 @@ public class UserGroupsService implements LdapService {
 		primaryGroupSid.append(")");
 		return primaryGroupSid.toString();
 	}
-
+	
+  /**
+   * See http://blogs.msdn.com/b/alextch/archive/2007/06/18/sample-java-application-that-retrieves-group-membership-of-an-active-directory-user-account.aspx
+   * @param SID
+   * @return
+   */
+	public static final String binarySidToStringSid(byte[] SID) {
+    String strSID = "";
+    // convert the SID into string format
+    long version;
+    long authority;
+    long count;
+    long rid;
+    strSID = "S";
+    version = SID[0];
+    strSID = strSID + "-" + Long.toString(version);
+    authority = SID[4];
+    for (int i = 0; i < 4; i++) {
+      authority <<= 8;
+      authority += SID[4 + i] & 0xFF;
+    }
+    strSID = strSID + "-" + Long.toString(authority);
+    count = SID[2];
+    count <<= 8;
+    count += SID[1] & 0xFF;
+    for (int j = 0; j < count; j++) {
+      rid = SID[11 + (j * 4)] & 0xFF;
+      for (int k = 1; k < 4; k++) {
+        rid <<= 8;
+        rid += SID[11 - k + (j * 4)] & 0xFF;
+      }
+      strSID = strSID + "-" + Long.toString(rid);
+    }
+    return strSID;
+  }
+	
 	/**
 	 * Returns user's primary group
 	 * 
 	 * @param userSid SID of the user in Active Directory
 	 * @param primaryGroupId domain local ID of the primary group
-	 * @return string containing the primary group's name
+	 * @param returnSamAccountName
+	 * @return string containing the primary group's name (dn or samAccountName)
 	 */
-	String getPrimaryGroupForTheSearchUser(byte[] userSid, String primaryGroupId) {
+	String getPrimaryGroupForTheSearchUser(byte[] userSid, String primaryGroupId, boolean returnSamAccountName) {
+	  long startTime = System.currentTimeMillis();
 		if (userSid == null || primaryGroupId == null) {
 			return null;
 		}
 		String primaryGroupDN = null;
-		SearchControls searchCtls = makeSearchCtls(new String[]{LdapConstants.ATTRIBUTE_MEMBER_OF});
-		searchCtls.setReturningAttributes(new String[]{});
+		String samAccountName = null;
+		SearchControls searchCtls = makeSearchCtls(new String[]{LdapConstants.ATTRIBUTE_SAMACCOUNTNAME});
 		// Create the search filter
 		String searchFilter = createSearchFilterForPrimaryGroup(userSid, primaryGroupId);
 		// Specify the Base DN for the search
@@ -440,8 +477,11 @@ public class UserGroupsService implements LdapService {
 		NamingEnumeration<SearchResult> ldapResults = null;
 		try {
 			ldapResults = this.context.search(searchBase, searchFilter, searchCtls);
-			SearchResult sr = ldapResults.next();
-			primaryGroupDN = sr.getNameInNamespace();
+			if (ldapResults != null && ldapResults.hasMoreElements()) {
+			  SearchResult sr = ldapResults.next();
+			  primaryGroupDN = sr.getNameInNamespace();
+			  samAccountName = (String) sr.getAttributes().get(LdapConstants.ATTRIBUTE_SAMACCOUNTNAME).get();
+			}
 		} catch (NamingException ne) {
 			LOGGER.log(Level.WARNING, "Failed to retrieve primary group with SID: ["
 					+ searchFilter + "]", ne);
@@ -454,13 +494,27 @@ public class UserGroupsService implements LdapService {
 				LOGGER.log(Level.WARNING, "Exception during clean up of ldap results.", e);
 			}
 		}
-		return primaryGroupDN;
+		String result = primaryGroupDN;
+    if (returnSamAccountName)
+      result = samAccountName;
+
+    long endTime = System.currentTimeMillis();
+		LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, searchFilter, Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+		LOGGER.log(Level.INFO, "AD primary group id resolved to ''{0}''", new String[] {result});
+		
+		return result;
 	}
 	
-	Set<String> getAllGroupsUsingInChainLdapQuery(String dn) {
+	/**
+	 * Search all (direct and nested) AD groups using IN_CHAIN query
+	 * @param dn
+	 * @return list of groups (samAccountName attributes, not dn-s)
+	 */
+	Set<String> getLdapGroupsUsingInChainQuery(String dn) {
+    long startTime = System.currentTimeMillis();
     // Create the search controls.
     SearchControls searchCtls = makeSearchCtls(new String[]{
-      LdapConstants.ATTRIBUTE_DN,
       LdapConstants.ATTRIBUTE_SAMACCOUNTNAME
     });
     // Create the search filter.
@@ -477,21 +531,9 @@ public class UserGroupsService implements LdapService {
         SearchResult sr = ldapResults.next();
         Attributes attrs = sr.getAttributes();
         if (attrs != null) {
-          try {
-            for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
-              Attribute attr = ae.next();
-              if (attr.getID().equals(LdapConstants.ATTRIBUTE_DN)){
-                result.add( (String) attr.get(0) );
-              } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_SAMACCOUNTNAME)){
-                // TODO: fetch sAMAccountName using this query, no need to do another query for this
-              } else {
-                // log warn?
-              }
-            }
-          } catch (NamingException e) {
-            LOGGER.log(Level.WARNING, "Exception while retrieving all groups for the search user using IN_CHAIN rule ["
-              + dn + "]", e);
-          }
+          String samAccountName = (String) attrs.get(LdapConstants.ATTRIBUTE_SAMACCOUNTNAME).get();
+          if (samAccountName != null)
+            result.add(samAccountName);
         }
       }
     } catch (NamingException ne) {
@@ -502,84 +544,216 @@ public class UserGroupsService implements LdapService {
         try {
           ldapResults.close();
         } catch (NamingException e) {
-          LOGGER.log(Level.WARNING, "Exception during clean up of ldap results for the search user : "
-              + dn, e);
+          LOGGER.log(Level.WARNING, "Exception during clean up of ldap results", e);
         }
       }
     }
     
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, searchFilter, Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Found ''{0}'' groups for user ''{1}'' using IN_CHAIN query:\n''{2}''", new Object[] {result.size(), dn, result});
+    
     return result;
 	}
-
+	
 	/**
-	 * Returns a set of all direct groups that the search user belongs to.
-	 * 
-	 * @param userName search user name
-	 * @return a set of direct groups that the user belongs to in AD.
+	 * Get all (direct and nested) AD groups using tokenGroups attribute
+	 * I.e. 
+	 *  - parse groups objectSid ids out of tokenGroups attribute
+	 *  - builds LDAP filter that lookups samAccountNames by objectSids 
+	 * @param dn
+	 * @return groups samAccountNames
 	 */
-	Set<String> getDirectGroupsForTheSearchUser(String userName, ReadAdGroupsType readAdGroupsType, StringBuffer dn) {
-		// Create the search controls.
-		SearchControls searchCtls = makeSearchCtls(new String[]{
-	    LdapConstants.ATTRIBUTE_DN,
-			LdapConstants.ATTRIBUTE_MEMBER_OF,
-			LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID,
-			LdapConstants.ATTRIBUTE_OBJECTSID
-		});
+	Set<String> getLdapGroupsUsingTokenGroups(String dn) {
+    long startTime = System.currentTimeMillis();
+    SearchControls searchCtls = new SearchControls();
+    searchCtls.setSearchScope(SearchControls.OBJECT_SCOPE);
+    searchCtls.setReturningAttributes(new String[] {LdapConstants.ATTRIBUTE_TOKEN_GROUPS});
+    
+    NamingEnumeration<SearchResult> ldapResults = null;
+    
+    Set<String> sids = new HashSet<String>(); 
+    try {
+      ldapResults = this.context.search(dn, LdapConstants.USER_SEARCH_FILTER, searchCtls);
+      while (ldapResults.hasMoreElements()) {
+        SearchResult sr = ldapResults.next();
+        Attributes attrs = sr.getAttributes();
+        if (attrs != null) {
+          for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
+            Attribute attr = ae.next();
+            for (NamingEnumeration<?> e = attr.getAll(); e.hasMore();) {
+              byte[] sid = (byte[]) e.next();
+              sids.add(binarySidToStringSid(sid));
+            }
+          }
+        }
+      }
+    } catch (NamingException e) {
+      LOGGER.log(Level.WARNING, "Failed to retrieve token groups for the user : [" + dn + "]", e);
+    } finally {
+      if (null != ldapResults) {
+        try {
+          ldapResults.close();
+        } catch (NamingException e) {
+          LOGGER.log(Level.WARNING, "Exception during clean up of ldap results", e);
+        }
+      }
+    }
+    
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { dn, LdapConstants.USER_SEARCH_FILTER, Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Found ''{0}'' groups sids for user ''{1}'' using TOKEN_GROUPS attribute:\n''{2}''", new Object[] {sids.size(), dn, sids});
+    
+    return resolveGroupsSidsToSamAccountNames(sids);
+	}
+	
+	/**
+	 * Resolve groups objectSids to samAccountNames 
+	 * @param sids
+	 * @return
+	 */
+	Set<String> resolveGroupsSidsToSamAccountNames(Set<String> sids) {
+    long startTime = System.currentTimeMillis();
+    SearchControls searchCtls = new SearchControls();
+    searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+    searchCtls.setReturningAttributes(new String[] {LdapConstants.ATTRIBUTE_SAMACCOUNTNAME});
+    String searchBase = ldapConnectionSettings.getBaseDN();
+    
+    StringBuffer groupsSearchFilter = new StringBuffer();
+    groupsSearchFilter.append("(|");
+    for (String sid : sids) {
+      groupsSearchFilter.append("(objectSid=" + sid + ")");
+    }
+    groupsSearchFilter.append(")");
+    
+    NamingEnumeration<SearchResult> ldapResults = null;
+    
+    Set<String> samAccountNames = new HashSet<String>(); 
+    
+    try {
+      ldapResults = this.context.search(searchBase, groupsSearchFilter.toString(), searchCtls);
+      while (ldapResults.hasMoreElements()) {
+        SearchResult sr = ldapResults.next();
+        Attributes attrs = sr.getAttributes();
+        if (attrs != null) {
+          Attribute attr = attrs.get(LdapConstants.ATTRIBUTE_SAMACCOUNTNAME);
+          if (attr != null) {
+            String samAccountName = (String) attr.get();
+            if (samAccountName != null) {
+              samAccountNames.add(samAccountName);
+            }
+          }
+        }
+      }
+    } catch (NamingException e) {
+      LOGGER.log(Level.WARNING, "Failed to resolve objectSids to samAccountNames", e);
+    } finally {
+      if (null != ldapResults) {
+        try {
+          ldapResults.close();
+        } catch (NamingException e) {
+          LOGGER.log(Level.WARNING, "Exception during clean up of ldap results", e);
+        }
+      }
+    }
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, groupsSearchFilter.toString(), Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Found ''{0}'' groups samAccountNames for ''{1}'' groups sids:\n''{2}''", new Object[] {samAccountNames.size(), sids.size(), samAccountNames});
+    
+    return samAccountNames;
+	}
+	
+	/**
+	 * Read user entry by samAccountName and retrieve
+	 * 1. dn attribute (for TOKEN_GROUPS and IN_CHAIN modes)
+	 * 2. primary group name (samAccountName for IN_CHAIN mode or dn for RECURSIVE mode)
+	 * 3. direct groups dns (for RECURSIVE mode)
+	 */
+	Set<String> readUserEntry(String userName, ReadAdGroupsType readAdGroupsType, StringBuffer userDn) {
+    long startTime = System.currentTimeMillis();
+	  List<String> attributes = new ArrayList<String>();
+	  if (readAdGroupsType != ReadAdGroupsType.TOKEN_GROUPS) {
+	    attributes.add(LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID);
+	    attributes.add(LdapConstants.ATTRIBUTE_OBJECTSID);
+	  }
+	  if (readAdGroupsType == ReadAdGroupsType.RECURSIVE) {
+	    attributes.add(LdapConstants.ATTRIBUTE_MEMBER_OF);
+	  }
+	  // Create the search controls.
+		SearchControls searchCtls = makeSearchCtls(attributes.toArray(new String[] {}));
 		// Create the search filter.
 		String searchFilter = createSearchFilterForDirectGroups(userName);
 		// Specify the Base DN for the search.
 		String searchBase = ldapConnectionSettings.getBaseDN();
-		int totalResults = 0;
-		Set<String> directGroups = new HashSet<String>();
+
+		Set<String> groups = new HashSet<String>();
 		NamingEnumeration<SearchResult> ldapResults = null;
+		String dn = null;
 		byte[] userSid = null;
 		String primaryGroupId = null;
 		try {
 			ldapResults = this.context.search(searchBase, searchFilter, searchCtls);
-			// Loop through the search results
-			while (ldapResults.hasMoreElements()) {
+			
+			if (ldapResults.hasMoreElements()) {
 				SearchResult sr = ldapResults.next();
+        dn = sr.getNameInNamespace();
 				Attributes attrs = sr.getAttributes();
 				if (attrs != null) {
-					try {
-						for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
-							Attribute attr = ae.next();
-              if (attr.getID().equals(LdapConstants.ATTRIBUTE_DN)){
-                dn.append( (String) attr.get(0) );
-              } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_OBJECTSID)){
-								userSid = (byte[])attr.get(0);
-							} else if (attr.getID().equals(LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID)) {
-								primaryGroupId = (String)attr.get(0);
-							} else {
-								for (NamingEnumeration<?> e = attr.getAll(); e.hasMore(); totalResults++) {
-									directGroups.add(e.next().toString());
-								}
-							}
-						}
-					} catch (NamingException e) {
-						LOGGER.log(Level.WARNING, "Exception while retrieving direct groups for the search user ["
-							+ userName + "]", e);
-					}
+          for (NamingEnumeration<? extends Attribute> ae = attrs.getAll(); ae.hasMore();) {
+            Attribute attr = ae.next();
+            if (attr.getID().equals(LdapConstants.ATTRIBUTE_OBJECTSID)) {
+              userSid = (byte[]) attr.get(0);
+            } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_PRIMARY_GROUP_ID)) {
+              primaryGroupId = (String) attr.get(0);
+            } else if (attr.getID().equals(LdapConstants.ATTRIBUTE_MEMBER_OF)){
+              for (NamingEnumeration<?> e = attr.getAll(); e.hasMore();) {
+                groups.add(e.next().toString());
+              }
+            }
+          }
 				}
 			}
 		} catch (NamingException ne) {
-			LOGGER.log(Level.WARNING, "Failed to retrieve direct groups for the user name : ["
-					+ userName + "]", ne);
+			LOGGER.log(Level.WARNING, "Failed to read AD user entry : [" + userName + "]", ne);
 		} finally {
 			if (null != ldapResults) {
 				try {
 					ldapResults.close();
 				} catch (NamingException e) {
-					LOGGER.log(Level.WARNING, "Exception during clean up of ldap results for the search user : "
-							+ userName, e);
+					LOGGER.log(Level.WARNING, "Exception during clean up of ldap results", e);
 				}
 			}
 		}
 		
-		directGroups.add(getPrimaryGroupForTheSearchUser(userSid, primaryGroupId));
-		LOGGER.info("[ " + userName + " ] is a direct member of "
-				+ directGroups.size() + " groups : " + directGroups);
-		return directGroups;
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, searchFilter, Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Retrieved dn=''{0}'', groups=''{1}'' for user ''{2}'' in ''{3}'' mode", new Object[] {dn, groups, userName, readAdGroupsType.toString()});
+		
+		if (dn == null) {
+		  // no user entry
+		  return null;
+		} else {
+		  userDn.append(dn);
+		}
+		
+		if (userSid != null && primaryGroupId != null) {
+		  String primaryGroupName = null;
+		  if (readAdGroupsType == ReadAdGroupsType.IN_CHAIN) {
+		    primaryGroupName = getPrimaryGroupForTheSearchUser(userSid, primaryGroupId, true);
+		  }
+      if (readAdGroupsType == ReadAdGroupsType.RECURSIVE) {
+        primaryGroupName = getPrimaryGroupForTheSearchUser(userSid, primaryGroupId, false);
+      }
+      if (primaryGroupName != null) {
+        groups.add(primaryGroupName);
+      }
+		}
+		
+		return groups;
 	}
 
 	private SearchControls makeSearchCtls(String attributes[]) {
@@ -637,6 +811,7 @@ public class UserGroupsService implements LdapService {
 	 * @return a set of all parent groups
 	 */
 	private Set<String> getAllParentGroupsForTheGroup(String groupName) {
+    long startTime = System.currentTimeMillis();
 		Set<String> parentGroups = new HashSet<String>();
 		// Create the search controls
 		SearchControls searchCtls = makeSearchCtls(new String[]{LdapConstants.ATTRIBUTE_MEMBER_OF});
@@ -676,6 +851,12 @@ public class UserGroupsService implements LdapService {
 				LOGGER.log(Level.WARNING, "Exception during clean up of ldap results.", e);
 			}
 		}
+    
+		long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, searchFilter, Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Found ''{0}'' parent groups for group ''{1}''", new Object[] {parentGroups.size(), groupName});
+		
 		return parentGroups;
 	}
 	
@@ -717,39 +898,61 @@ public class UserGroupsService implements LdapService {
 		if (Strings.isNullOrEmpty(userName)) {
 			return null;
 		}
-		Set<String> ldapGroups = new HashSet<String>();
-		Set<String> directGroups = new HashSet<String>();
-		LOGGER.info("Quering LDAP directory server to fetch all direct groups for the search user: "
-				+ userName);
-		// fix me by creating a LDAP connection poll instead of creating context
-		// object on demand.
-		this.context = new LdapConnection(
-				sharepointClientContext.getLdapConnectionSettings()).createContext();
+		Set<String> result = null;
 		
-    StringBuffer dn = new StringBuffer("");
-		directGroups = getDirectGroupsForTheSearchUser(userName, sharepointClientContext.getLdapConnectionSettings().getReadAdGroupsType(), dn);
-
-    if (sharepointClientContext.getLdapConnectionSettings().getReadAdGroupsType() == ReadAdGroupsType.IN_CHAIN) {
-      // using IN_CHAIN rule to get all AD groups in a single query
-      for (String groupName : directGroups) {
-        if (!Strings.isNullOrEmpty(groupName)) {
-          ldapGroups.add(groupName);
+    ReadAdGroupsType readAdGroupsType = sharepointClientContext.getLdapConnectionSettings().getReadAdGroupsType();
+    
+    long startTime = System.currentTimeMillis();
+    
+    // fix me by creating a LDAP connection poll instead of creating context
+    // object on demand.
+    this.context = new LdapConnection(
+        sharepointClientContext.getLdapConnectionSettings()).createContext();
+    
+    try {
+      if (readAdGroupsType == ReadAdGroupsType.TOKEN_GROUPS) {
+        // 1. lookup samAccountName -> dn
+        StringBuffer dn = new StringBuffer("");
+        if( readUserEntry(userName, readAdGroupsType, dn) == null ) {
+          // no user entry
+          return null;
         }
+        // 2. read ldap groups using tokenGroups attribute (returns samAccountNames)
+        result = getLdapGroupsUsingTokenGroups(dn.toString());
       }
-      if (!Strings.isNullOrEmpty(dn.toString())) {
-        ldapGroups.addAll( getAllGroupsUsingInChainLdapQuery(dn.toString()) );
+      if (readAdGroupsType == ReadAdGroupsType.IN_CHAIN) {
+        // 1. lookup samAccountName -> dn + retrieve primary group
+        StringBuffer dn = new StringBuffer("");
+        result = readUserEntry(userName, readAdGroupsType, dn);
+        if (result == null) {
+          // no user entry
+          return null;
+        }
+        // 2. read ldap groups using IN_CHAIN rule (returns samAccountNames)
+        result.addAll(getLdapGroupsUsingInChainQuery(dn.toString()));
       }
-      
-    } else {
-      // _recursively_ retrieve all the groups
-      for (String groupName : directGroups) {
-        getAllParentGroups(groupName, ldapGroups);
+      if (readAdGroupsType == ReadAdGroupsType.RECURSIVE) {
+        StringBuffer dn = new StringBuffer("");
+        // 1. read direct groups + primary group (returns dn-s, need to be resolved to samAccountNames)
+        Set<String> groupsDns = readUserEntry(userName, readAdGroupsType, dn);
+        if (groupsDns == null) {
+          // no user entry
+          return null;
+        }
+        // 2. recursively retrieve all the nested groups
+        Set<String> resultGroupsDns = new HashSet<String>();
+        for (String groupName : groupsDns) {
+          getAllParentGroups(groupName, resultGroupsDns);
+        }
+        // 3. resolve groups dns to samAccountNames
+        result = resolveDnsToSamAccountNames(resultGroupsDns);
       }
+    } finally {
+      long endTime = System.currentTimeMillis();
+      LOGGER.log(Level.INFO, "Found ''{0}'' LDAP groups for user ''{1}'' in ''{2}'' ms", new Object[] { result == null ? 0 : result.size(), userName, (endTime - startTime)});
     }
-    LOGGER.info("[ " + userName + " ] is a direct or indirect member of "
-        + ldapGroups.size() + " groups");
-    Set<String> groupNames = getSAMAccountNames(ldapGroups);
-    return groupNames;
+
+    return result;
 	}
 
 	/**
@@ -757,7 +960,8 @@ public class UserGroupsService implements LdapService {
 	 * @param groups list of distinguishedNames of all groups to resolve
 	 * @return sAMAccountName for each of the entities
 	 */
-	Set<String> getSAMAccountNames(Set<String> distinguishedNames) {
+	Set<String> resolveDnsToSamAccountNames(Set<String> distinguishedNames) {
+    long startTime = System.currentTimeMillis();
 		Set<String> result = new HashSet<String>();
 		// Create the search controls
 		SearchControls searchCtls = makeSearchCtls(
@@ -786,33 +990,33 @@ public class UserGroupsService implements LdapService {
 								LdapConstants.ATTRIBUTE_SAMACCOUNTNAME);
 						if (sAMAccountName == null || sAMAccountName.size() == 0) {
 							LOGGER.log(Level.WARNING,
-									"Could not establish sAMAccountName for [" 
-									+ sr.getNameInNamespace() + "]");
+									"Could not establish sAMAccountName for [" + sr.getNameInNamespace() + "]");
 							continue;
 						}
 						result.add(sAMAccountName.get(0).toString());
 					} catch (NamingException e) {
-						LOGGER.log(Level.WARNING,
-								"Exception while retrieving group names. Search filter ["
-								+ filter + "]", e);
+						LOGGER.log(Level.WARNING, "Exception while retrieving group names. Search filter [" + filter + "]", e);
 					}
 				}
 			}
 		} catch (NamingException ne) {
-			LOGGER.log(Level.WARNING,
-					"Exception while retrieving group names. Search filter ["
-					+ filter + "]", ne);
+			LOGGER.log(Level.WARNING, "Exception while retrieving group names. Search filter [" + filter + "]", ne);
 		} finally {
 			try {
 				if (null != ldapResults) {
 					ldapResults.close();
 				}
 			} catch (NamingException e) {
-				LOGGER.log(
-						Level.WARNING, "Exception during clean up of ldap results.", e);
+				LOGGER.log(Level.WARNING, "Exception during clean up of ldap results.", e);
 			}
 		}
-	return result;
+		
+    long endTime = System.currentTimeMillis();
+    LOGGER.log(Level.INFO, "AD query: base_dn=''{0}'', filter=''{1}'', attrs=''{2}'', time=''{3}''",
+        new String[] { searchBase, filter.toString(), Arrays.toString(searchCtls.getReturningAttributes()), (endTime - startTime) + "ms"  });
+    LOGGER.log(Level.INFO, "Found ''{0}'' groups samAccountNames for ''{1}'' groups dns:\n''{2}''", new Object[] {result.size(), distinguishedNames.size(), result});
+		
+    return result;
 	}
 
 	/*
@@ -905,11 +1109,14 @@ public class UserGroupsService implements LdapService {
 				if (null != userGroupsMap) {
 					allUserGroups.addAll(userGroupsMap.get(SPConstants.ADGROUPS));
 					allUserGroups.addAll(userGroupsMap.get(SPConstants.SPGROUPS));
+
+					this.lugCacheStore.put(searchUser.toLowerCase(), userGroupsMap);
+
+	        return allUserGroups;
+				} else {
+				  return null;
 				}
 
-				this.lugCacheStore.put(searchUser.toLowerCase(), userGroupsMap);
-
-				return allUserGroups;
 			}
 		} else {
 			if (Strings.isNullOrEmpty(searchUser)) {
@@ -917,8 +1124,10 @@ public class UserGroupsService implements LdapService {
 			}
 			LOGGER.info("The LDAP cache is not yet initialized and hence querying LDAP and User Data Store directly.");
 			userGroupsMap = getAllADGroupsAndSPGroupsForSearchUser(searchUser);
-			allUserGroups.addAll(userGroupsMap.get(SPConstants.ADGROUPS));
-			allUserGroups.addAll(userGroupsMap.get(SPConstants.SPGROUPS));
+			if (userGroupsMap != null) {
+			  allUserGroups.addAll(userGroupsMap.get(SPConstants.ADGROUPS));
+			  allUserGroups.addAll(userGroupsMap.get(SPConstants.SPGROUPS));
+			}
 		}
 		if (null != userGroupsMap) {
 			userGroupsMap = null;
@@ -995,7 +1204,10 @@ public class UserGroupsService implements LdapService {
 		Set<String> finalADGroups = new HashSet<String>();
 		try {
 			adGroups = getAllLdapGroups(searchUser);
-			if (null != adGroups && adGroups.size() > 0) {
+			if (adGroups == null) {
+			  return null;
+			}
+			if (adGroups.size() > 0) {
 				finalADGroups = addGroupNameFormatForTheGroups(adGroups);
 			}
 			finalADGroups.add("NT AUTHORITY\\authenticated users");
