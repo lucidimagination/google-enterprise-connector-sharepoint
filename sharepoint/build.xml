@@ -386,7 +386,7 @@
 
   <!-- Cobertura Tasks -->
 
-  <taskdef classpathref="cobertura.classpath" resource="tasks.properties" />
+  <!-- <taskdef classpathref="cobertura.classpath" resource="tasks.properties" /> -->
 
   <target name="init_code_coverage">
     <mkdir dir="${classes.dir}" />
