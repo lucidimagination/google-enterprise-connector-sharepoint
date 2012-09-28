@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Web;
 using System.Web.Services;
+using System.Security.Principal;
 using Microsoft.SharePoint;
 using Microsoft.SharePoint.Administration;
 using Microsoft.SharePoint.Utilities;
@@ -1330,21 +1331,24 @@ public sealed class GssAclUtility
 
         if (manager != null &&
             (bool)managerType.GetMethod("IsEncodedClaim").Invoke(manager, new object[]{identity}))
-	{
+        {
             Object claim = managerType.GetMethod("DecodeClaim").Invoke(manager, new object[]{identity});
-            string username = (string)claim.GetType().GetProperty("Value").GetValue(claim, null);
-            if (username == "true")
+            string claimValue = (string) claim.GetType().GetProperty("Value").GetValue(claim, null);
+            if (claimValue == "true")
             {
                 return "Everyone";
             }
-            else if (username == "windows")
+            if (claimValue == "windows")
             {
                 return "NT AUTHORITY\\Authenticated Users";
             }
-            else
+
+            string claimType = (string) claim.GetType().GetProperty("ClaimType").GetValue(claim, null);
+            if (claimType == "http://schemas.microsoft.com/ws/2008/06/identity/claims/groupsid")
             {
-                return username;
+                return new SecurityIdentifier(claimValue).Translate(typeof(NTAccount)).ToString();
             }
+            return claimValue;
         }
         else
         {
