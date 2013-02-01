@@ -1003,10 +1003,12 @@ public class SharepointConnectorType implements ConnectorType {
 						ed.set(key, rb.getString(SPConstants.MALFORMED_URL));
 						return false;
 					}
+					/*
 					if (!isInFQDN(val)) {
 						ed.set(key, rb.getString(SPConstants.REQ_FQDN_URL));
 						return false;
 					}
+					*/
 				} else if (collator.equals(key, SPConstants.INCLUDED_URLS)) {
 					final Set<String> invalidSet = validatePatterns(val);
 					if (invalidSet != null) {
@@ -1088,6 +1090,7 @@ public class SharepointConnectorType implements ConnectorType {
 		}
 		status = null;
 
+		/* DO NOT REQUIRE GOOGLE SERVICES TO BE DEPLOYED ON SHAREPOINT SERVER
 		if (FeedType.CONTENT_FEED == feedType) {
 			status = checkGSConnectivity(sharepointUrl);
 			if (!SPConstants.CONNECTIVITY_SUCCESS.equalsIgnoreCase(status)) {
@@ -1096,6 +1099,7 @@ public class SharepointConnectorType implements ConnectorType {
 				return false;
 			}
 		}
+		*/
 		status = null;
 
 		status = checkConnectivity(sharepointUrl);
