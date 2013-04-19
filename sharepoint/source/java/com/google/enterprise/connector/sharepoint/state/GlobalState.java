@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -233,6 +234,11 @@ public class GlobalState {
         lastFullCrawlDateTime = atts.getValue(SPConstants.LAST_FULL_CRAWL_DATETIME);
       } else if (SPConstants.STATE_FEEDTYPE.equals(localName)) {
         feedType = FeedType.getFeedType(atts.getValue(SPConstants.STATE_TYPE));
+      } else if ("DefaultUrl".equals(localName)) {
+        Calendar lastModified = Util.jodaToCalendar(Util.parseDate(atts.getValue("LastModified")));
+        UrlInfo info = new UrlInfo(atts.getValue("ObjectType"), lastModified);
+        defaultsUrlsMap.put(atts.getValue("Url"), info);
+      } else if ("DefaultUrlsCrawled".equals(localName)) {
       }
     }
 
@@ -680,6 +686,31 @@ public class GlobalState {
     }
   }
 
+  private static class UrlInfo {
+    String objectType;
+    Calendar lastModified;
+
+    UrlInfo(String type, Calendar modified) {
+      objectType = type;
+      lastModified = modified;
+    }
+  }
+
+  private Map<String, UrlInfo> defaultsUrlsMap = new TreeMap<String, UrlInfo>();
+
+  public Calendar getLastModifiedTime(String url) {
+    UrlInfo info = defaultsUrlsMap.get(url);
+    return info == null ? null : info.lastModified;
+  }
+
+  public void updateModifiedDate(String url, SPDocument doc) {
+    if (defaultsUrlsMap.containsKey(url)) {
+      defaultsUrlsMap.get(url).lastModified = doc.getLastMod();
+    } else {
+      defaultsUrlsMap.put(url, new UrlInfo(doc.getObjType(), doc.getLastMod()));
+    }
+  }
+
   public void dumpStateToXML(ContentHandler handler) throws SAXException {
     AttributesImpl atts = new AttributesImpl();
     handler.startDocument();
@@ -690,6 +721,22 @@ public class GlobalState {
     atts.addAttribute("", "", SPConstants.STATE_TYPE, SPConstants.STATE_ATTR_ID, feedType.toString());
     handler.startElement("", "", SPConstants.STATE_FEEDTYPE, atts);
     handler.endElement("", "", SPConstants.STATE_FEEDTYPE);
+
+    atts.clear();
+    handler.startElement("", "", "DefaultUrlsCrawled", atts);
+    for (Map.Entry<String, UrlInfo> entry : defaultsUrlsMap.entrySet()) {
+      String url = entry.getKey();
+      UrlInfo info = entry.getValue();
+
+      atts.clear();
+      atts.addAttribute("", "", "Url", SPConstants.STATE_ATTR_ID, url);
+      atts.addAttribute("", "", "ObjectType", SPConstants.STATE_ATTR_CDATA, info.objectType);
+      atts.addAttribute("", "", "LastModified", SPConstants.STATE_ATTR_CDATA, Util.formatDate(info.lastModified));
+
+      handler.startElement("", "", "DefaultUrl", atts);
+      handler.endElement("", "", "DefaultUrl");
+    }
+    handler.endElement("", "", "DefaultUrlsCrawled");
 
     // FULL_RECRAWL_FLAG
     atts.clear();

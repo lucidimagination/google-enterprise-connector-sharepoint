@@ -110,9 +110,34 @@ public class SharepointClient {
         doc.setContentDwnldURL(doc.getUrl());
       }
 
-      newlist.add(doc);
-      LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
-          + doc.getUrl() + " ]");
+      // If the url is the default home page we check the last time
+      // we crawled it.  If the time elapsed since the last crawl is
+      // less than one hour we ignore the change (this protects against the
+      // WF instance where home pages are changed every 5 minutes), if not
+      // we proceed as usual
+      if (doc.getUrl().indexOf("default.aspx") != -1) {
+          long prev = 0;
+          Calendar lastModified = globalState.getLastModifiedTime(doc.getUrl());
+          if (lastModified != null) prev = lastModified.getTimeInMillis();
+
+          long current = doc.getLastMod().getTimeInMillis();
+
+          if (current - prev >= 3600000L) {
+              newlist.add(doc);
+              globalState.updateModifiedDate(doc.getUrl(), doc);
+              LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
+                      + doc.getUrl() + " ]");
+          } else {
+              LOGGER.info("Ignoring [ Docid= " + doc.getDocId() + ", URL = " + doc.getUrl()
+                      + " ], it's been less than an hour since the last crawl.");
+          }
+          LOGGER.log(Level.FINEST, "LastMod = " + Util.formatDate(doc.getLastMod())
+                  + " , PrevLastMod =  " + (lastModified == null ? "-1" : Util.formatDate(lastModified)));
+      } else {
+          newlist.add(doc);
+          LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
+                  + doc.getUrl() + " ]");
+      }
     }
 
     final SPDocumentList docList = new SPDocumentList(newlist, globalState);
