@@ -31,6 +31,8 @@ import com.google.enterprise.connector.sharepoint.wsclient.UserProfileWS;
 import com.google.enterprise.connector.sharepoint.wsclient.WebsWS;
 import com.google.enterprise.connector.spi.SpiConstants.ActionType;
 
+import org.joda.time.DateTime;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -38,7 +40,9 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -57,6 +61,15 @@ public class SharepointClient {
   private final Logger LOGGER = Logger.getLogger(SharepointClient.class.getName());
   private SharepointClientContext sharepointClientContext;
   private int nDocuments = 0;
+
+  // This map allows us to perform only one crawl for items
+  // whose Sharepoint visibility is off
+  private Map<String, DateTime> lastModificationPerList;
+
+  // The attachments associated with a given list item.
+  // We use this to propagate/update permissions for attachments
+  private Map<String, List<SPDocument>> listItemToAttachments =
+      new TreeMap<String, List<SPDocument>>();
 
   // true -> when threshold is not reached and all webs
   // all lists all documents are done.
@@ -266,6 +279,25 @@ public class SharepointClient {
 
     LOGGER.config(noOfVisitedListStates + " lists scanned from site "
         + webState.getWebUrl() + ". found " + resultSet + " docs");
+
+    // During the list traversals we built a map from items to
+    // attachment.  At this point we have the ACL for the items
+    // so we can safely propagate them to their attachments.
+    if (resultSet != null) {
+      for (SPDocument document : resultSet.getDocuments()) {
+        List<SPDocument> attachments = listItemToAttachments.get(
+            document.getDocId());
+        if (attachments != null && !attachments.isEmpty()) {
+          for (SPDocument attachment : attachments) {
+            LOGGER.config("Propagating ACL users/groups from [ " + 
+                document.getUrl() + " ] to attachment [ " +
+                attachment.getUrl() + " ]");
+            attachment.setUsersAclMap(document.getUsersAclMap());
+            attachment.setGroupsAclMap(document.getGroupsAclMap());
+          }
+        }
+      }
+    }
 
     return resultSet;
   }
@@ -838,6 +870,10 @@ public class SharepointClient {
     }
   }
 
+  public void setLastModificationPerListMap(Map<String, DateTime> lastModMap) {
+    this.lastModificationPerList = lastModMap;
+  }
+
   /**
    * Gets all the docs from the SPDocument Library and all the items and their
    * attachments from Generic Lists and Issues in sharepoint under a given site.
@@ -921,6 +957,11 @@ public class SharepointClient {
       final ListState currentList = listCollection.get(i);
       ListState listState = webState.lookupList(currentList.getPrimaryKey());
 
+      // This boolean helps us decide if we should crawl the current item
+      // even though its sharepoint visibility is off.
+      // If true we perform the crawl to create DELETE feeds,
+      // otherwise proceed as usual.
+      boolean noCrawl = false;
       if (sharepointClientContext.isUseSPSearchVisibility()) {
         // If this list is marked for No Crawling, do not crawl this
         // list.
@@ -935,12 +976,24 @@ public class SharepointClient {
           LOGGER.log(Level.WARNING, "Skipping List URL [ "
               + currentList.getListURL()
               + " ] while crawling because it has been marked for No Crawling on SharePoint. ");
-          if (null == listState) {
+          // if (null == listState) {
             // Make this list known by keeping it in the state. But,
             // do not crawl
-            webState.AddOrUpdateListStateInWebState(currentList, currentList.getLastMod());
+            // webState.AddOrUpdateListStateInWebState(currentList, currentList.getLastMod());
+          // }
+          // continue;
+          DateTime lastMod = lastModificationPerList.get(currentList.getListURL());
+          if (lastMod != null &&
+              lastMod.isEqual(currentList.getLastMod())) {
+            LOGGER.config("Ignoring List URL [ " + currentList.getListURL()
+                    + " ], we already crawled it for DELETE feeds.");
+            continue;
+          } else {
+            LOGGER.config("Visiting NoCrawl List URL [ " + currentList.getListURL() +
+                " ] lastMod = " + currentList.getLastMod());
+            lastModificationPerList.put(currentList.getListURL(), currentList.getLastMod());
+            noCrawl = true;
           }
-          continue;
         }
       }
 
@@ -976,7 +1029,8 @@ public class SharepointClient {
           }
 
           try {
-            listItems = listsWS.getListItemChangesSinceToken(listState, allWebs);
+            listItems = noCrawl ? listsWS.getListItems(listState, null, null, allWebs)
+                    : listsWS.getListItemChangesSinceToken(listState, allWebs);
           } catch (final Exception e) {
             LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
                 + listState.getListURL() + " ].", e);
@@ -1049,7 +1103,8 @@ public class SharepointClient {
             if (null == aclChangedItems
                 || aclChangedItems.size() < sharepointClientContext.getBatchHint()) {
               // Do regular incremental crawl
-              listItems = listsWS.getListItemChangesSinceToken(listState, allWebs);
+              listItems = noCrawl ? listsWS.getListItems(listState, null, null, allWebs) :
+                  listsWS.getListItemChangesSinceToken(listState, allWebs);
             }
           } catch (final Exception e) {
             LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
@@ -1088,9 +1143,27 @@ public class SharepointClient {
         final List<SPDocument> attachmentItems = new ArrayList<SPDocument>();
         for (int j = 0; j < listItems.size(); j++) {
           final SPDocument doc = listItems.get(j);
-          if (ActionType.ADD.equals(doc.getAction())) {
+          final String currentDocId = doc.getDocId();
+
+          if (ActionType.ADD.equals(doc.getAction()) || noCrawl) {
+            LOGGER.config("Fetching attachments of item: " + doc.toString());
             final List<SPDocument> attachments = listsWS.getAttachments(listState, doc);
             attachmentItems.addAll(attachments);
+            if (attachments == null || attachments.isEmpty()) {
+              LOGGER.config("Returned list of attachments is EMPTY.");
+            } else {
+              LOGGER.config("Found " + attachments.size() + " attachments:");
+              for (SPDocument att : attachments) {
+                LOGGER.config(att.toString());
+              }
+            }
+
+            // Link the attachments to their list item owner
+            if (listItemToAttachments.containsKey(currentDocId)) {
+              listItemToAttachments.get(currentDocId).addAll(attachments);
+            } else {
+              listItemToAttachments.put(currentDocId, attachments);
+            }
           }
         }
         listItems.addAll(attachmentItems);
@@ -1119,6 +1192,52 @@ public class SharepointClient {
         doCrawl = false;
       }
 
+      // When dealing with inherited permissions the changed items are in
+      // the aclChangedItems list, hence we need to perform a loop
+      // on this elements, fetch attachments and save them in our map
+      // from listItem to listOfAttachments
+      if (listState.canContainAttachments() && (aclChangedItems != null)) {
+        LOGGER.config("Processing aclChangedItems for listState: " + listState);
+        final List<SPDocument> attachmentItems = new ArrayList<SPDocument>();
+        for (int j = 0; j < aclChangedItems.size(); ++j) {
+          final SPDocument item = aclChangedItems.get(j);
+          final String currentItemId = item.getDocId();
+          LOGGER.config("Processing: " + item + ", actionType = " + item.getAction()
+                  + ", objectType = " + item.getObjType());
+
+          if (ActionType.ADD.equals(item.getAction()) || noCrawl) {
+            // Attachments are associated with list items
+            if (item.getObjType().equals("Item")) {
+              LOGGER.config("Fetching attachments of item: " + item.toString());
+              final List<SPDocument> attachments = listsWS.getAttachments(listState, item);
+              if (attachments == null || attachments.isEmpty()) {
+                LOGGER.config("Returned list of attachments is EMPTY.");
+              } else {
+                listItems.addAll(attachments);
+                LOGGER.config("Found " + attachments.size() + " attachments:");
+                for (SPDocument att : attachments) {
+                  LOGGER.config(att.toString());
+                }
+              }
+
+              if (listItemToAttachments.containsKey(currentItemId)) {
+                listItemToAttachments.get(currentItemId).addAll(attachments);
+              } else {
+                listItemToAttachments.put(currentItemId, attachments);
+              }
+            }
+          }
+        }
+        aclChangedItems.addAll(attachmentItems);
+      }
+
+      // Log the results of acl-based crawling
+      // This will include not only items but also its attachments
+      if (aclChangedItems != null) {
+        for (SPDocument doc : aclChangedItems) {
+          LOGGER.config("ACL-CHANGED doc: " + doc.toString() + "; type: " + doc.getObjType());
+        }
+      }
       // Add aclChangedItems to the docs crawled under regular crawling.
       // This is the right place to do this because all the operations
       // pertaining to regular crawling have been made. But, the
@@ -1128,6 +1247,13 @@ public class SharepointClient {
           listItems.addAll(aclChangedItems);
         } else {
           listItems = aclChangedItems;
+        }
+      }
+
+      if (noCrawl) {
+        LOGGER.config("List state " + listState + " was crawled to create DELETE feeds");
+        for (SPDocument document : listItems) {
+          document.setAction(ActionType.DELETE);
         }
       }
 

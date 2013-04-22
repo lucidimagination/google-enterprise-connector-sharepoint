@@ -25,7 +25,11 @@ import com.google.enterprise.connector.spi.TraversalContext;
 import com.google.enterprise.connector.spi.TraversalContextAware;
 import com.google.enterprise.connector.spi.TraversalManager;
 
+import org.joda.time.DateTime;
+
 import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,6 +47,10 @@ public class SharepointTraversalManager implements TraversalManager,
   private SharepointClientContext sharepointClientContextOriginal = null;
   private GlobalState globalState;
   private int hint = -1;
+
+  // Allows us to perform just one crawl for lists
+  // whose sharepoint visibility is off
+  private Map<String, DateTime> lastModificationPerList = new HashMap<String, DateTime>();
 
   // The traversal context instance
   private TraversalContext traversalContext;
@@ -173,6 +181,7 @@ public class SharepointTraversalManager implements TraversalManager,
 
     final SharepointClient sharepointClient = new SharepointClient(
         sharepointClientContext);
+    sharepointClient.setLastModificationPerListMap(lastModificationPerList);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;
