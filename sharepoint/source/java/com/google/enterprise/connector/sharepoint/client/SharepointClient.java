@@ -1251,9 +1251,9 @@ public class SharepointClient {
       }
 
       if (noCrawl) {
-        LOGGER.config("List state " + listState + " was crawled to create DELETE feeds");
+        LOGGER.config("List state " + listState + " was crawled to create FORBID feeds");
         for (SPDocument document : listItems) {
-          document.setAction(ActionType.DELETE);
+          document.setAction(ActionType.FORBID);
         }
       }
 
