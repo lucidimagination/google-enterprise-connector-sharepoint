@@ -1371,7 +1371,7 @@ public class ListState implements StatefulObject {
     }
 
     list.setLastCrawledDateTime(atts.getValue(SPConstants.LAST_CRAWLED_DATETIME));
-    list.setAclChanged(Boolean.getBoolean(atts.getValue(SPConstants.STATE_ISACLCHANGED)));
+    list.setAclChanged(Boolean.parseBoolean(atts.getValue(SPConstants.STATE_ISACLCHANGED)));
     if (list.isAclChanged()) {
       try {
         list.setLastDocIdCrawledForAcl(Integer.getInteger(atts.getValue(SPConstants.STATE_LASTDOCIDCRAWLEDFORACL)));
@@ -1404,7 +1404,7 @@ public class ListState implements StatefulObject {
       }
     }
 
-    list.setNoCrawl(Boolean.getBoolean(atts.getValue(SPConstants.STATE_NOCRAWL)));
+    list.setNoCrawl(Boolean.parseBoolean(atts.getValue(SPConstants.STATE_NOCRAWL)));
 
     return list;
   }

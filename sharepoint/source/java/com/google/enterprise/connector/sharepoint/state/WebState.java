@@ -658,8 +658,8 @@ public class WebState implements StatefulObject {
     web.setCurretAclChangeToken(atts.getValue(SPConstants.STATE_ACLCHANGETOKEN));
 
     WebCrawlInfo webCrawlInfo = new WebCrawlInfo();
-    webCrawlInfo.setNoCrawl(Boolean.getBoolean(atts.getValue(SPConstants.STATE_NOCRAWL)));
-    webCrawlInfo.setCrawlAspxPages(Boolean.getBoolean(atts.getValue(SPConstants.STATE_CRAWLASPXPAGES)));
+    webCrawlInfo.setNoCrawl(Boolean.parseBoolean(atts.getValue(SPConstants.STATE_NOCRAWL)));
+    webCrawlInfo.setCrawlAspxPages(Boolean.parseBoolean(atts.getValue(SPConstants.STATE_CRAWLASPXPAGES)));
     web.setWebCrawlInfo(webCrawlInfo);
 
     return web;
