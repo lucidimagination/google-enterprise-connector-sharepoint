@@ -18,6 +18,7 @@ import com.google.enterprise.connector.sharepoint.client.SPConstants.FeedType;
 import com.google.enterprise.connector.sharepoint.client.SPConstants.SPType;
 import com.google.enterprise.connector.sharepoint.spiimpl.SPDocument;
 import com.google.enterprise.connector.sharepoint.spiimpl.SPDocumentList;
+import com.google.enterprise.connector.sharepoint.spiimpl.SharepointConnector;
 import com.google.enterprise.connector.sharepoint.spiimpl.SharepointException;
 import com.google.enterprise.connector.sharepoint.state.GlobalState;
 import com.google.enterprise.connector.sharepoint.state.ListState;
@@ -81,10 +82,21 @@ public class SharepointClient {
   // checked for any docs pending from previous crawl cycle
   private int noOfVisitedListStates = 0;
 
+  // The connector associated with this client
+  private SharepointConnector sharepointConnector;
+
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
       throws SharepointException {
     sharepointClientContext = inSharepointClientContext;
+  }
+
+  public void setConnector(SharepointConnector connector) {
+    sharepointConnector = connector;
+  }
+
+  private boolean isStopTraversal() {
+    return sharepointConnector.isStopTraversal();
   }
 
   /**
@@ -113,7 +125,8 @@ public class SharepointClient {
       return null;
     }
     final ArrayList<SPDocument> newlist = new ArrayList<SPDocument>();
-    for (final Iterator<SPDocument> iter = list.getCrawlQueue().iterator(); iter.hasNext();) {
+    for (final Iterator<SPDocument> iter = list.getCrawlQueue().iterator();
+         !isStopTraversal() && iter.hasNext();) {
       final SPDocument doc = iter.next();
       doc.setParentList(list);
       doc.setParentWeb(web);
@@ -223,7 +236,8 @@ public class SharepointClient {
 
     noOfVisitedListStates = 0;
     SPDocumentList resultSet = null;
-    for (final Iterator<ListState> iter = webState.getCurrentListstateIterator(); iter.hasNext();) {
+    for (final Iterator<ListState> iter = webState.getCurrentListstateIterator();
+         !isStopTraversal() && iter.hasNext();) {
       final ListState list = iter.next();
 
       // Mark this list as current list so that the next traversal
@@ -272,6 +286,10 @@ public class SharepointClient {
       }
     }
 
+    // fast return in case we were stopped
+    // we avoid fetching the acls for documents that won't be indexed
+    if (isStopTraversal())
+      return null;
     // Fetch ACL for all the documents crawled from the current WebState
     if (!handleACLForDocuments(resultSet, webState, globalState, sendPendingDocs)) {
       return null;
@@ -1322,6 +1340,8 @@ public class SharepointClient {
       if (ws == null) {
         continue;
       }
+
+      if (isStopTraversal()) break;
 
       final String webURL = ws.getPrimaryKey();
 

@@ -98,7 +98,17 @@ public class SharepointConnector implements Connector,
 	private String connectorName;
 	private UserDataStoreDAO userDataStoreDAO;
 
+	private volatile boolean stopTraversal;
+
 	public SharepointConnector() {
+	}
+
+	public void setStopTraversal(boolean stop) {
+		this.stopTraversal = stop;
+	}
+
+	public boolean isStopTraversal() {
+		return stopTraversal;
 	}
 
 	/**
@@ -723,6 +733,7 @@ public class SharepointConnector implements Connector,
 	public void shutdown() throws RepositoryException {
 		LOGGER.info("Shutting down the connector with the name [" + connectorName
 				+ "]");
+		setStopTraversal(true);
 	}
 
 	/*

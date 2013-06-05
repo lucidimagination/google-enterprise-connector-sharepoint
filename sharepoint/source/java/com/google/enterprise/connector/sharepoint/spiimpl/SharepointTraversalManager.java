@@ -27,9 +27,15 @@ import com.google.enterprise.connector.spi.TraversalManager;
 
 import org.joda.time.DateTime;
 
-import java.util.Iterator;
-import java.util.Map;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,6 +53,8 @@ public class SharepointTraversalManager implements TraversalManager,
   private SharepointClientContext sharepointClientContextOriginal = null;
   private GlobalState globalState;
   private int hint = -1;
+
+  private SharepointConnector sharepointConnector;
 
   // Allows us to perform just one crawl for lists
   // whose sharepoint visibility is off
@@ -71,6 +79,7 @@ public class SharepointTraversalManager implements TraversalManager,
       throw new SharepointException(
           "Cannot initialize traversal manager because SharePointConnector object is null.");
     }
+    sharepointConnector = inConnector;
     if (inSharepointClientContext == null) {
       throw new SharepointException(
           "Cannot initialize traversal manager because SharePointClientContext object is null.");
@@ -159,6 +168,12 @@ public class SharepointTraversalManager implements TraversalManager,
   private DocumentList doTraversal() throws RepositoryException {
     LOGGER.config("doTraversal()");
 
+    // Early stop
+    if (sharepointConnector.isStopTraversal()) {
+      LOGGER.info("Stopping traversal");
+      return null;
+    }
+
     if (hint == -1) {
       LOGGER.severe("Batch hint is -1");
       throw new SharepointException("Batch hint is -1");
@@ -181,6 +196,7 @@ public class SharepointTraversalManager implements TraversalManager,
 
     final SharepointClient sharepointClient = new SharepointClient(
         sharepointClientContext);
+    sharepointClient.setConnector(sharepointConnector);
     sharepointClient.setLastModificationPerListMap(lastModificationPerList);
 
     sharepointClientContext.setBatchHint(hint);
@@ -219,7 +235,8 @@ public class SharepointTraversalManager implements TraversalManager,
         LOGGER.info("No documents to be sent from the current crawl cycle.");
       }
       if (sharepointClient.isDoCrawl() && (null == rsAll || rsAll.size() == 0)
-          && null != globalState.getLastCrawledWeb()) {
+          && null != globalState.getLastCrawledWeb()
+          && !sharepointConnector.isStopTraversal()) {
         LOGGER.log(Level.INFO, "Setting LastCrawledWebStateID and LastCrawledListStateID as null and updating the state file to reflect that a full crawl has completed...");
         globalState.setLastCrawledWeb(null);
         globalState.setLastCrawledList(null);
@@ -237,6 +254,9 @@ public class SharepointTraversalManager implements TraversalManager,
       LOGGER.info("Traversal returned [0] documents");
     }
 
+    if (sharepointConnector.isStopTraversal()) {
+      LOGGER.info("Traversal is returning null for Stop request");
+    }
     return rsAll;
   }
 
@@ -291,7 +311,7 @@ public class SharepointTraversalManager implements TraversalManager,
     int sizeSoFar = 0;
     LOGGER.log(Level.INFO, "Checking crawl queues of all ListStates/WebStates for pending docs.");
     for (final Iterator<WebState> iter = globalState.getCircularIterator(); iter.hasNext()
-        && (sizeSoFar < hint);) {
+        && (sizeSoFar < hint) && !sharepointConnector.isStopTraversal();) {
       final WebState webState = iter.next();
       globalState.setCurrentWeb(webState);
       SPDocumentList rs = null;
