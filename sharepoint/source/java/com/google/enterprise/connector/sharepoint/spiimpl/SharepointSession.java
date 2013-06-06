@@ -82,6 +82,7 @@ public class SharepointSession implements Session {
    */
   public TraversalManager getTraversalManager() throws RepositoryException {
     LOGGER.info("getTraversalManager()");
+    connector.setStopTraversal(false);
     return new SharepointTraversalManager(connector, sharepointClientContext);
   }
 
