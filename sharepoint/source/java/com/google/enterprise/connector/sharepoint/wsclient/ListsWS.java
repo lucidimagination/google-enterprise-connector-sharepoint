@@ -130,6 +130,14 @@ public class ListsWS {
     }
   }
 
+  public String getRowLimitForWs() {
+    return rowLimit;
+  }
+
+  public void setRowLimitForWs(String rowLimit) {
+    this.rowLimit = rowLimit;
+  }
+
   /**
    * Gets all the attachments of a particular list item.
    *

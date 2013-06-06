@@ -60,6 +60,9 @@ public class SharepointTraversalManager implements TraversalManager,
   // whose sharepoint visibility is off
   private Map<String, DateTime> lastModificationPerList = new HashMap<String, DateTime>();
 
+  private Map<String, List<SPDocument>> pendingDocsPerList =
+      new HashMap<String, List<SPDocument>>();
+
   // The traversal context instance
   private TraversalContext traversalContext;
 
@@ -198,6 +201,7 @@ public class SharepointTraversalManager implements TraversalManager,
         sharepointClientContext);
     sharepointClient.setConnector(sharepointConnector);
     sharepointClient.setLastModificationPerListMap(lastModificationPerList);
+    sharepointClient.setPendingDocsPerListMap(pendingDocsPerList);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;

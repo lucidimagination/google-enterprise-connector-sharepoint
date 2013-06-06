@@ -85,6 +85,8 @@ public class SharepointClient {
   // The connector associated with this client
   private SharepointConnector sharepointConnector;
 
+  private Map<String, List<SPDocument>> pendingDocsPerList;
+
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
       throws SharepointException {
@@ -892,6 +894,22 @@ public class SharepointClient {
     this.lastModificationPerList = lastModMap;
   }
 
+  public void setPendingDocsPerListMap(Map<String, List<SPDocument>> pendingDocsPerList) {
+    this.pendingDocsPerList = pendingDocsPerList;
+  }
+
+  private List<SPDocument> fetchBatch(List<SPDocument> docs) {
+    int limit = Math.min(docs.size(), sharepointClientContext.getBatchHint());
+    List<SPDocument> batch = new ArrayList<SPDocument>();
+    for (int i = 0; i < limit; ++i) {
+      batch.add(docs.get(i));
+    }
+    for (int i = 0; i < limit; ++i) {
+      docs.remove(0);
+    }
+    return batch;
+  }
+
   /**
    * Gets all the docs from the SPDocument Library and all the items and their
    * attachments from Generic Lists and Issues in sharepoint under a given site.
@@ -1000,16 +1018,13 @@ public class SharepointClient {
             // webState.AddOrUpdateListStateInWebState(currentList, currentList.getLastMod());
           // }
           // continue;
-          DateTime lastMod = lastModificationPerList.get(currentList.getListURL());
-          if (lastMod != null &&
-              lastMod.isEqual(currentList.getLastMod())) {
+          List<SPDocument> docsPending = pendingDocsPerList.get(currentList.getListURL());
+          if (docsPending != null && docsPending.isEmpty()) {
             LOGGER.config("Ignoring List URL [ " + currentList.getListURL()
                     + " ], we already crawled it for DELETE feeds.");
             continue;
           } else {
-            LOGGER.config("Visiting NoCrawl List URL [ " + currentList.getListURL() +
-                " ] lastMod = " + currentList.getLastMod());
-            lastModificationPerList.put(currentList.getListURL(), currentList.getLastMod());
+            LOGGER.config("Visiting NoCrawl List URL [ " + currentList.getListURL() + " ]");
             noCrawl = true;
           }
         }
@@ -1047,8 +1062,20 @@ public class SharepointClient {
           }
 
           try {
-            listItems = noCrawl ? listsWS.getListItems(listState, null, null, allWebs)
-                    : listsWS.getListItemChangesSinceToken(listState, allWebs);
+            if (noCrawl) {
+              // since it's the first time we see this hidden list
+              // fetch all of its items, and save them in memory
+              // TODO This is ugly, add a get/set method for rowLimit
+              String prevRowLimit = listsWS.getRowLimitForWs();
+              listsWS.setRowLimitForWs("10000");
+              List<SPDocument> items = listsWS.getListItems(listState, null, null, allWebs);
+              listItems = fetchBatch(items);
+              pendingDocsPerList.put(listState.getListURL(), items);
+              listsWS.setRowLimitForWs(prevRowLimit);
+            } else {
+              // TODO Should fix for defect 3 go here too ?
+              listItems = listsWS.getListItemChangesSinceToken(listState, allWebs);
+            }
           } catch (final Exception e) {
             LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
                 + listState.getListURL() + " ].", e);
@@ -1121,8 +1148,21 @@ public class SharepointClient {
             if (null == aclChangedItems
                 || aclChangedItems.size() < sharepointClientContext.getBatchHint()) {
               // Do regular incremental crawl
-              listItems = noCrawl ? listsWS.getListItems(listState, null, null, allWebs) :
-                  listsWS.getListItemChangesSinceToken(listState, allWebs);
+              if (noCrawl) {
+                List<SPDocument> pendingItems = pendingDocsPerList.get(listState.getListURL());
+                if (pendingItems == null) {
+                  // again fetch them all
+                  String prevRowLimit = listsWS.getRowLimitForWs();
+                  // TODO Find another way for an unlimited web-service call
+                  listsWS.setRowLimitForWs("10000");
+                  List<SPDocument> items = listsWS.getListItems(listState, null, null, allWebs);
+                  pendingDocsPerList.put(listState.getListURL(), items);
+                  listsWS.setRowLimitForWs(prevRowLimit);
+                }
+                listItems = fetchBatch(pendingDocsPerList.get(listState.getListURL()));
+              } else {
+                listItems = listsWS.getListItemChangesSinceToken(listState, allWebs);
+              }
             }
           } catch (final Exception e) {
             LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
