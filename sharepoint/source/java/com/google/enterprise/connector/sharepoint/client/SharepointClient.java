@@ -63,6 +63,8 @@ public class SharepointClient {
   private SharepointClientContext sharepointClientContext;
   private int nDocuments = 0;
 
+  private String rootUrl;
+
   // This map allows us to perform only one crawl for items
   // whose Sharepoint visibility is off
   private Map<String, DateTime> lastModificationPerList;
@@ -95,6 +97,8 @@ public class SharepointClient {
       final SharepointClientContext inSharepointClientContext)
       throws SharepointException {
     sharepointClientContext = inSharepointClientContext;
+    rootUrl = sharepointClientContext.getSiteURL();
+    LOGGER.info("rootUrl: " + rootUrl);
   }
 
   public void setConnector(SharepointConnector connector) {
@@ -1478,6 +1482,16 @@ public class SharepointClient {
       sharepointClientContext.setSiteURL(webURL);
       WebsWS websWS = new WebsWS(sharepointClientContext);
       try {
+        if (rootUrl != null && sharepointClientContext.getSiteURL().equals(rootUrl)) {
+          GSSiteDiscoveryWS siteDiscoveryWS = new GSSiteDiscoveryWS(sharepointClientContext, null);
+          Set<String> additionalSites = siteDiscoveryWS.getMatchingSiteCollections();
+          LOGGER.config("Forcing addition of sites returned by GSSiteDiscoveryWs:");
+          for (String site : additionalSites) {
+            LOGGER.config("Additional Site: " + site);
+          }
+          allSites.addAll(additionalSites);
+        }
+
         final Set<String> allWebStateSet = websWS.getDirectChildsites();
         final int size = allWebStateSet.size();
         if (size > 0) {
