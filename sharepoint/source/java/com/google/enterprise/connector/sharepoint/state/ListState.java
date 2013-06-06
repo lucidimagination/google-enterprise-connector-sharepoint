@@ -584,7 +584,7 @@ public class ListState implements StatefulObject {
    * way of updating ChangeToken is to call
    * {@link ListState#commitChangeTokenForWSCall()}
    */
-  private void setChangeTokenForWSCall(String inChangeToken) {
+  public void setChangeTokenForWSCall(String inChangeToken) {
     currentChangeToken = inChangeToken;
   }
 

@@ -63,6 +63,8 @@ public class SharepointTraversalManager implements TraversalManager,
   private Map<String, List<SPDocument>> pendingDocsPerList =
       new HashMap<String, List<SPDocument>>();
 
+  private Set<String> vsChangedLists = new HashSet<String>();
+
   // The traversal context instance
   private TraversalContext traversalContext;
 
@@ -202,6 +204,7 @@ public class SharepointTraversalManager implements TraversalManager,
     sharepointClient.setConnector(sharepointConnector);
     sharepointClient.setLastModificationPerListMap(lastModificationPerList);
     sharepointClient.setPendingDocsPerListMap(pendingDocsPerList);
+    sharepointClient.setVsChangedListsSet(vsChangedLists);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;

@@ -87,6 +87,8 @@ public class SharepointClient {
 
   private Map<String, List<SPDocument>> pendingDocsPerList;
 
+  private Set<String> vsChangedLists;
+
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
       throws SharepointException {
@@ -910,6 +912,10 @@ public class SharepointClient {
     return batch;
   }
 
+  public void setVsChangedListsSet(Set<String> changedLists) {
+    this.vsChangedLists = changedLists;
+  }
+
   /**
    * Gets all the docs from the SPDocument Library and all the items and their
    * attachments from Generic Lists and Issues in sharepoint under a given site.
@@ -965,6 +971,11 @@ public class SharepointClient {
     for (ListState currentListState : listCollection) {
       ListState listState = webState.lookupList(currentListState.getPrimaryKey());
       if (null != listState) {
+        if (!currentListState.isNoCrawl() && listState.isNoCrawl()) {
+          vsChangedLists.add(currentListState.getPrimaryKey());
+          LOGGER.info("Adding: " + currentListState.getListURL() +
+              " to vsChangeDLists because of visibility change.");
+        }
         listState.updateList(currentListState);
       }
     }
@@ -1035,10 +1046,27 @@ public class SharepointClient {
        * changed since the last doc we processed. If it's a new list (e.g. the
        * first SharePoint traversal), we fetch everything.
        */
-      if (listState == null) {
+      boolean changed = vsChangedLists.contains(currentList.getPrimaryKey());
+      if (listState == null || changed) {
+        ListState prevState = listState;
         listState = currentList;
         listState.setNewList(true);
-        webState.AddOrUpdateListStateInWebState(listState, listState.getLastMod());
+
+        if (changed) {
+          LOGGER.info("NextChangeToken of " + listState.getListURL() + " = "
+              + listState.getNextChangeTokenForSubsequectWSCalls());
+          // listState.setChangeTokenForWSCall(null);
+          vsChangedLists.remove(listState.getPrimaryKey());
+          webState.AddOrUpdateListStateInWebState(prevState, listState.getLastMod());
+          listState = prevState;
+          listState.setChangeTokenForWSCall(null);
+          vsChangedLists.remove(listState.getPrimaryKey());
+
+          // Should not happen
+          if (prevState == null)
+            LOGGER.info("SERIOUS ERROR");
+        } else
+          webState.AddOrUpdateListStateInWebState(listState, listState.getLastMod());
         LOGGER.info("discovered new listState. List URL: "
             + listState.getListURL());
 
