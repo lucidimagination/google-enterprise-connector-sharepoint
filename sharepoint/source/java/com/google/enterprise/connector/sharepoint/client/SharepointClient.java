@@ -89,6 +89,8 @@ public class SharepointClient {
 
   private Set<String> vsChangedLists;
 
+  private Set<String> defaultUrlsSet;
+
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
       throws SharepointException {
@@ -97,6 +99,10 @@ public class SharepointClient {
 
   public void setConnector(SharepointConnector connector) {
     sharepointConnector = connector;
+  }
+
+  public void setDefaultUrlsSet(Set<String> defaultUrlsSet) {
+    this.defaultUrlsSet = defaultUrlsSet;
   }
 
   private boolean isStopTraversal() {
@@ -140,29 +146,16 @@ public class SharepointClient {
         doc.setContentDwnldURL(doc.getUrl());
       }
 
-      // If the url is the default home page we check the last time
-      // we crawled it.  If the time elapsed since the last crawl is
-      // less than one hour we ignore the change (this protects against the
-      // WF instance where home pages are changed every 5 minutes), if not
-      // we proceed as usual
+      // If the url is the default home page we crawl it just once
+      // as part of the whole crawl
       if (doc.getUrl().indexOf("default.aspx") != -1) {
-          long prev = 0;
-          Calendar lastModified = globalState.getLastModifiedTime(doc.getUrl());
-          if (lastModified != null) prev = lastModified.getTimeInMillis();
-
-          long current = doc.getLastMod().getTimeInMillis();
-
-          if (current - prev >= 3600000L) {
-              newlist.add(doc);
-              globalState.updateModifiedDate(doc.getUrl(), doc);
-              LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
-                      + doc.getUrl() + " ]");
-          } else {
-              LOGGER.info("Ignoring [ Docid= " + doc.getDocId() + ", URL = " + doc.getUrl()
-                      + " ], it's been less than an hour since the last crawl.");
-          }
-          LOGGER.log(Level.FINEST, "LastMod = " + Util.formatDate(doc.getLastMod())
-                  + " , PrevLastMod =  " + (lastModified == null ? "-1" : Util.formatDate(lastModified)));
+        if (defaultUrlsSet.contains(doc.getUrl())) {
+          LOGGER.info("Ignoring [ DocId = " + doc.getDocId() + ", URL = "
+              + doc.getUrl() + " ], it has already been crawled.");
+        } else {
+          newlist.add(doc);
+          defaultUrlsSet.add(doc.getUrl());
+        }
       } else {
           newlist.add(doc);
           LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "

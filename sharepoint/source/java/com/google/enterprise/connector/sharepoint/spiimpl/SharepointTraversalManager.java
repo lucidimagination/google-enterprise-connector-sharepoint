@@ -65,6 +65,8 @@ public class SharepointTraversalManager implements TraversalManager,
 
   private Set<String> vsChangedLists = new HashSet<String>();
 
+  private Set<String> defaultUrlsSet = new HashSet<String>();
+
   // The traversal context instance
   private TraversalContext traversalContext;
 
@@ -205,6 +207,7 @@ public class SharepointTraversalManager implements TraversalManager,
     sharepointClient.setLastModificationPerListMap(lastModificationPerList);
     sharepointClient.setPendingDocsPerListMap(pendingDocsPerList);
     sharepointClient.setVsChangedListsSet(vsChangedLists);
+    sharepointClient.setDefaultUrlsSet(defaultUrlsSet);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;
