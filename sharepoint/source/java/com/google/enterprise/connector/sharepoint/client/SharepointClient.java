@@ -14,6 +14,20 @@
 
 package com.google.enterprise.connector.sharepoint.client;
 
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.enterprise.connector.sharepoint.client.SPConstants.FeedType;
 import com.google.enterprise.connector.sharepoint.client.SPConstants.SPType;
 import com.google.enterprise.connector.sharepoint.spiimpl.SPDocument;
@@ -32,22 +46,6 @@ import com.google.enterprise.connector.sharepoint.wsclient.UserProfileWS;
 import com.google.enterprise.connector.sharepoint.wsclient.WebsWS;
 import com.google.enterprise.connector.spi.SpiConstants.ActionType;
 
-import org.joda.time.DateTime;
-
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  * This class provides a layer of abstraction between the SharePoint Traversal
  * Manager and the java clients for making web service calls. Every time
@@ -64,10 +62,6 @@ public class SharepointClient {
   private int nDocuments = 0;
 
   private String rootUrl;
-
-  // This map allows us to perform only one crawl for items
-  // whose Sharepoint visibility is off
-  private Map<String, DateTime> lastModificationPerList;
 
   // The attachments associated with a given list item.
   // We use this to propagate/update permissions for attachments
@@ -887,10 +881,6 @@ public class SharepointClient {
       webState.AddOrUpdateListStateInWebState(dummyAlertListState, currentDummyAlertList.getLastMod());
       dummyAlertListState.setCrawlQueue(listCollectionAlerts);
     }
-  }
-
-  public void setLastModificationPerListMap(Map<String, DateTime> lastModMap) {
-    this.lastModificationPerList = lastModMap;
   }
 
   public void setPendingDocsPerListMap(Map<String, List<SPDocument>> pendingDocsPerList) {

@@ -14,19 +14,6 @@
 
 package com.google.enterprise.connector.sharepoint.spiimpl;
 
-import com.google.enterprise.connector.sharepoint.client.SharepointClient;
-import com.google.enterprise.connector.sharepoint.client.SharepointClientContext;
-import com.google.enterprise.connector.sharepoint.state.GlobalState;
-import com.google.enterprise.connector.sharepoint.state.ListState;
-import com.google.enterprise.connector.sharepoint.state.WebState;
-import com.google.enterprise.connector.spi.DocumentList;
-import com.google.enterprise.connector.spi.RepositoryException;
-import com.google.enterprise.connector.spi.TraversalContext;
-import com.google.enterprise.connector.spi.TraversalContextAware;
-import com.google.enterprise.connector.spi.TraversalManager;
-
-import org.joda.time.DateTime;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +25,17 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.google.enterprise.connector.sharepoint.client.SharepointClient;
+import com.google.enterprise.connector.sharepoint.client.SharepointClientContext;
+import com.google.enterprise.connector.sharepoint.state.GlobalState;
+import com.google.enterprise.connector.sharepoint.state.ListState;
+import com.google.enterprise.connector.sharepoint.state.WebState;
+import com.google.enterprise.connector.spi.DocumentList;
+import com.google.enterprise.connector.spi.RepositoryException;
+import com.google.enterprise.connector.spi.TraversalContext;
+import com.google.enterprise.connector.spi.TraversalContextAware;
+import com.google.enterprise.connector.spi.TraversalManager;
 
 /**
  * This class is an implementation of the TraversalManager from the spi. All the
@@ -55,10 +53,6 @@ public class SharepointTraversalManager implements TraversalManager,
   private int hint = -1;
 
   private SharepointConnector sharepointConnector;
-
-  // Allows us to perform just one crawl for lists
-  // whose sharepoint visibility is off
-  private Map<String, DateTime> lastModificationPerList = new HashMap<String, DateTime>();
 
   private Map<String, List<SPDocument>> pendingDocsPerList =
       new HashMap<String, List<SPDocument>>();
@@ -207,7 +201,6 @@ public class SharepointTraversalManager implements TraversalManager,
     final SharepointClient sharepointClient = new SharepointClient(
         sharepointClientContext);
     sharepointClient.setConnector(sharepointConnector);
-    sharepointClient.setLastModificationPerListMap(lastModificationPerList);
     sharepointClient.setPendingDocsPerListMap(pendingDocsPerList);
     sharepointClient.setVsChangedListsSet(vsChangedLists);
     sharepointClient.setDefaultUrlsSet(defaultUrlsSet);
@@ -265,37 +258,40 @@ public class SharepointTraversalManager implements TraversalManager,
         if (!possibleAclChanges.isEmpty()) {
           Map.Entry<WebState, TreeSet<SPDocument>> entry =
               possibleAclChanges.pollFirstEntry();
-          while (entry.getValue().isEmpty() && !possibleAclChanges.isEmpty()) {
-            entry = possibleAclChanges.pollFirstEntry();
-          }
-
-          TreeSet<SPDocument> webStateDocs = entry.getValue();
-          if (!webStateDocs.isEmpty()) {
-            int limit = Math.min(sharepointClientContext.getBatchHint(), webStateDocs.size());
-            List<SPDocument> changedDocs = new ArrayList<SPDocument>(limit);
-
-            for (int i = 0; i < limit; ++i) {
-              changedDocs.add(webStateDocs.pollFirst());
-            }
-
-            if (!webStateDocs.isEmpty()) { // restore it
-              possibleAclChanges.put(entry.getKey(), webStateDocs);
-            }
-
-            LOGGER.info("Pulling document for webState: " + entry.getKey().getWebUrl()
-                + " that may have an acl-change:");
-            for (SPDocument doc : changedDocs) {
-              LOGGER.info("===> " + doc);
-              doc.setContentDwnldURL(doc.getUrl());
-              doc.setSharepointClientContext(sharepointClientContext);
-            }
-
-            if (rsAll == null) rsAll = new SPDocumentList(changedDocs, globalState);
-            else rsAll.getDocuments().addAll(changedDocs);
-
-            // fetch acl for the documents
-            sharepointClient.handleACLForDocuments(rsAll, entry.getKey(),
-                globalState, false);
+          if(entry != null) {
+              while (entry.getValue().isEmpty() && !possibleAclChanges.isEmpty()) {
+                entry = possibleAclChanges.pollFirstEntry();
+              }
+              if(!entry.getValue().isEmpty() ){                  
+                  TreeSet<SPDocument> webStateDocs = entry.getValue();
+                  if (!webStateDocs.isEmpty()) {
+                    int limit = Math.min(sharepointClientContext.getBatchHint(), webStateDocs.size());
+                    List<SPDocument> changedDocs = new ArrayList<SPDocument>(limit);
+        
+                    for (int i = 0; i < limit; ++i) {
+                      changedDocs.add(webStateDocs.pollFirst());
+                    }
+        
+                    if (!webStateDocs.isEmpty()) { // restore it
+                      possibleAclChanges.put(entry.getKey(), webStateDocs);
+                    }
+        
+                    LOGGER.info("Pulling document for webState: " + entry.getKey().getWebUrl()
+                        + " that may have an acl-change:");
+                    for (SPDocument doc : changedDocs) {
+                      LOGGER.info("===> " + doc);
+                      doc.setContentDwnldURL(doc.getUrl());
+                      doc.setSharepointClientContext(sharepointClientContext);
+                    }
+        
+                    if (rsAll == null) rsAll = new SPDocumentList(changedDocs, globalState);
+                    else rsAll.getDocuments().addAll(changedDocs);
+        
+                    // fetch acl for the documents
+                    sharepointClient.handleACLForDocuments(rsAll, entry.getKey(),
+                        globalState, false);
+                  }
+              }
           }
         }
       }
@@ -318,10 +314,6 @@ public class SharepointTraversalManager implements TraversalManager,
       LOGGER.info("Traversal returned [" + rsAll.size() + "] documents");
     } else {
       LOGGER.info("Traversal returned [0] documents");
-    }
-
-    if (sharepointConnector.isStopTraversal()) {
-      LOGGER.info("Traversal is returning null for Stop request");
     }
     return rsAll;
   }
