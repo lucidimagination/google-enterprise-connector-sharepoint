@@ -337,7 +337,7 @@ public class SharepointClient {
    * @return True if ACL was retrieved successfully OR false in case of any
    *         exceptions/errors
    */
-  boolean handleACLForDocuments(SPDocumentList resultSet, WebState webState,
+  public boolean handleACLForDocuments(SPDocumentList resultSet, WebState webState,
       GlobalState globalState, boolean sendPendingDocs) {
 
     if (!sharepointClientContext.isPushAcls()) {
@@ -913,6 +913,12 @@ public class SharepointClient {
     this.vsChangedLists = changedLists;
   }
 
+  private TreeMap<WebState, TreeSet<SPDocument>> possibleAclChanges;
+
+  public void setPossibleAclChangesMap(TreeMap<WebState, TreeSet<SPDocument>> map) {
+    possibleAclChanges = map;
+  }
+
   /**
    * Gets all the docs from the SPDocument Library and all the items and their
    * attachments from Generic Lists and Issues in sharepoint under a given site.
@@ -1186,7 +1192,14 @@ public class SharepointClient {
                 }
                 listItems = fetchBatch(pendingDocsPerList.get(listState.getListURL()));
               } else {
+                List<SPDocument> buffer = new ArrayList<SPDocument>();
+                listsWS.setPossibleAclChangesList(buffer);
                 listItems = listsWS.getListItemChangesSinceToken(listState, allWebs);
+
+                WebState parentWeb = listState.getParentWebState();
+                if (!possibleAclChanges.containsKey(parentWeb))
+                  possibleAclChanges.put(parentWeb, new TreeSet<SPDocument>());
+                possibleAclChanges.get(parentWeb).addAll(buffer);
               }
             }
           } catch (final Exception e) {
