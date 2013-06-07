@@ -49,6 +49,7 @@ import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -1298,6 +1299,35 @@ public class ListsWS {
     list.saveNextChangeTokenForWSCall(lastChangeToken);
   }
 
+  private List<SPDocument> getListItemsInsideFolder(String relativeURL, ListState listState) {
+    Set<String> tmp = new HashSet<String>();
+    String prevRowLimit = getRowLimitForWs();
+    setRowLimitForWs("100000");
+    List<SPDocument> items = getListItems(listState, null, null, tmp);
+    setRowLimitForWs(prevRowLimit);
+
+    for (Iterator<SPDocument> iterator = items.iterator(); iterator.hasNext(); ) {
+      SPDocument doc = iterator.next();
+      try {
+        URL url = new URL(doc.getUrl());
+        String path = url.getPath();
+        if (path.startsWith("/")) path = path.substring(1);
+
+        if (!path.startsWith(relativeURL))
+          iterator.remove();
+      } catch (MalformedURLException ex) {
+        // just ignore
+      }
+    }
+    return items;
+  }
+
+  private List<SPDocument> possibleAclChanges;
+
+  public void setPossibleAclChangesList(List<SPDocument> list) {
+    possibleAclChanges = list;
+  }
+
   /**
    * Processing of rs:data element as returned by getListItemChangesSinceToken.
    *
@@ -1383,6 +1413,18 @@ public class ListsWS {
               list.removeFromDeleteCache(docId);
 
               if (contentType.equalsIgnoreCase(SPConstants.CONTENT_TYPE_FOLDER)) {
+                // Retrieve all leaf-documents
+                List<Folder> folders = getSubFoldersRecursively(list, new Folder(relativeURL, docId), null);
+                List<SPDocument> docs = getListItemsInsideFolder(relativeURL, list);
+                LOGGER.info("FIX3 list of docs:");
+                for (SPDocument doc : docs) {
+                  LOGGER.info("======> " + doc.toString());
+                  doc.setParentList(list);
+                  //doc.setParentWeb();
+                }
+
+                possibleAclChanges.addAll(docs);
+
                 if (!list.updateExtraIDs(relativeURL, docId, true)) {
                   // Try again after updating the folders
                   // info.

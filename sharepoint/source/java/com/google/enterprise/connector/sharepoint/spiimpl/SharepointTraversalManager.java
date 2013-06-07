@@ -67,6 +67,9 @@ public class SharepointTraversalManager implements TraversalManager,
 
   private Set<String> defaultUrlsSet = new HashSet<String>();
 
+  private TreeMap<WebState, TreeSet<SPDocument>> possibleAclChanges =
+      new TreeMap<WebState, TreeSet<SPDocument>>();
+
   // The traversal context instance
   private TraversalContext traversalContext;
 
@@ -208,6 +211,7 @@ public class SharepointTraversalManager implements TraversalManager,
     sharepointClient.setPendingDocsPerListMap(pendingDocsPerList);
     sharepointClient.setVsChangedListsSet(vsChangedLists);
     sharepointClient.setDefaultUrlsSet(defaultUrlsSet);
+    sharepointClient.setPossibleAclChangesMap(possibleAclChanges);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;
@@ -244,6 +248,58 @@ public class SharepointTraversalManager implements TraversalManager,
       } else {
         LOGGER.info("No documents to be sent from the current crawl cycle.");
       }
+      // Fix for defect 3
+      if (rsAll != null) {
+        // Remove from possibleAclChanges all docs that were crawled as part
+        // of the regular traversal
+        for (SPDocument doc : rsAll.getDocuments()) {
+          TreeSet<SPDocument> changes = possibleAclChanges.get(
+              doc.getParentList().getParentWebState());
+          if (changes != null)
+            changes.remove(doc);
+        }
+      }
+
+      if (rsAll == null || rsAll.size() == 0) {
+        // Pull documents from possibleAclChanges
+        if (!possibleAclChanges.isEmpty()) {
+          Map.Entry<WebState, TreeSet<SPDocument>> entry =
+              possibleAclChanges.pollFirstEntry();
+          while (entry.getValue().isEmpty() && !possibleAclChanges.isEmpty()) {
+            entry = possibleAclChanges.pollFirstEntry();
+          }
+
+          TreeSet<SPDocument> webStateDocs = entry.getValue();
+          if (!webStateDocs.isEmpty()) {
+            int limit = Math.min(sharepointClientContext.getBatchHint(), webStateDocs.size());
+            List<SPDocument> changedDocs = new ArrayList<SPDocument>(limit);
+
+            for (int i = 0; i < limit; ++i) {
+              changedDocs.add(webStateDocs.pollFirst());
+            }
+
+            if (!webStateDocs.isEmpty()) { // restore it
+              possibleAclChanges.put(entry.getKey(), webStateDocs);
+            }
+
+            LOGGER.info("Pulling document for webState: " + entry.getKey().getWebUrl()
+                + " that may have an acl-change:");
+            for (SPDocument doc : changedDocs) {
+              LOGGER.info("===> " + doc);
+              doc.setContentDwnldURL(doc.getUrl());
+              doc.setSharepointClientContext(sharepointClientContext);
+            }
+
+            if (rsAll == null) rsAll = new SPDocumentList(changedDocs, globalState);
+            else rsAll.getDocuments().addAll(changedDocs);
+
+            // fetch acl for the documents
+            sharepointClient.handleACLForDocuments(rsAll, entry.getKey(),
+                globalState, false);
+          }
+        }
+      }
+
       if (sharepointClient.isDoCrawl() && (null == rsAll || rsAll.size() == 0)
           && null != globalState.getLastCrawledWeb()
           && !sharepointConnector.isStopTraversal()) {
