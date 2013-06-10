@@ -284,6 +284,7 @@ public class UserGroupsService implements LdapService {
 				}
 				env.put(Context.SECURITY_AUTHENTICATION, "none"); //$NON-NLS-1$
 			}
+			env.put(Context.REFERRAL, "follow");
 			env.put(Context.PROVIDER_URL, makeLdapUrl());
 			return env;
 		}
