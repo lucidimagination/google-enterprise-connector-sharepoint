@@ -1065,6 +1065,12 @@ public class SharepointClient {
           listState.setChangeTokenForWSCall(null);
           vsChangedLists.remove(listState.getPrimaryKey());
 
+          // Print helpful information about the liststate
+          LOGGER.config("nextPage = " + listState.getNextPage() +
+              "biggestID = " + listState.getBiggestID() +
+              "lastDocProcessed = " + listState.getLastDocProcessed());
+          listState.setLastDocProcessed(null);
+
           // Should not happen
           if (prevState == null)
             LOGGER.info("SERIOUS ERROR");
