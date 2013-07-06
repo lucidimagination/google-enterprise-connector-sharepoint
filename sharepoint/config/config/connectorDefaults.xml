@@ -27,6 +27,9 @@
     <property name="initialCacheSize" value="${initialCacheSize}"/>
     <property name="cacheRefreshInterval" value="${cacheRefreshInterval}"/>
     <property name="feedUnPublishedDocuments" value="${feedUnPublishedDocuments}"/>
+
+    <property name="visitsPerUrl" value="${visitsPerUrl}"/>
+
     <property name="included_metadata">
     <list>
       <!-- If you want to index only specific metadata, put them here.

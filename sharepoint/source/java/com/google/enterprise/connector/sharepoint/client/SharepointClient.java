@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -92,6 +93,9 @@ public class SharepointClient {
   private Set<String> vsChangedLists;
 
   private Set<String> defaultUrlsSet;
+
+  private HashMap<String, Integer> urlVisitCount;
+  private HashMap<String, String> urlToChecksum;
 
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
@@ -150,20 +154,18 @@ public class SharepointClient {
         doc.setContentDwnldURL(doc.getUrl());
       }
 
-      // If the url is the default home page we crawl it just once
-      // as part of the whole crawl
-      if (doc.getUrl().indexOf("default.aspx") != -1) {
-        if (defaultUrlsSet.contains(doc.getUrl())) {
-          LOGGER.info("Ignoring [ DocId = " + doc.getDocId() + ", URL = "
-              + doc.getUrl() + " ], it has already been crawled.");
-        } else {
-          newlist.add(doc);
-          defaultUrlsSet.add(doc.getUrl());
-        }
+      // If the number of times we have visited this particular
+      // url equals the maximum allowed number then ignore it
+      int visitsSoFar = urlVisitCount.containsKey(doc.getUrl()) ?
+          urlVisitCount.get(doc.getUrl()) : 0;
+      if (visitsSoFar < sharepointConnector.getVisitsPerUrl()) {
+        newlist.add(doc);
+        urlVisitCount.put(doc.getUrl(), visitsSoFar+1);
+        LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
+            + doc.getUrl() + " ]");
       } else {
-          newlist.add(doc);
-          LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
-                  + doc.getUrl() + " ]");
+        LOGGER.info("Ignoring [ DocId = " + doc.getDocId() + ", URL = "
+            + doc.getUrl() + " ], it has been crawled enough times.");
       }
     }
 
@@ -314,6 +316,28 @@ public class SharepointClient {
             attachment.setUsersAclMap(document.getUsersAclMap());
             attachment.setGroupsAclMap(document.getGroupsAclMap());
           }
+        }
+      }
+    }
+
+    if (resultSet != null && resultSet.getDocuments() != null) {
+      Iterator<SPDocument> iter = resultSet.getDocuments().iterator();
+      while (iter.hasNext()) {
+        SPDocument doc = iter.next();
+        if (!ActionType.ADD.equals(doc.getAction())) continue;
+        try {
+          String checksum = doc.getChecksum();
+          LOGGER.info(doc.getUrl() + " -> " + checksum);
+          if (!checksum.equals(urlToChecksum.get(doc.getUrl()))) {
+            // valid change
+            urlToChecksum.put(doc.getUrl(), checksum);
+            urlVisitCount.put(doc.getUrl(), 0);
+          } else {
+            LOGGER.info("Ignoring change, checksums are identical.");
+          }
+        } catch (Exception ex) {
+          LOGGER.log(Level.WARNING, "Error while computing checksum for doc [ "
+              + doc.getUrl() + " ]", ex);
         }
       }
     }
@@ -917,6 +941,14 @@ public class SharepointClient {
 
   public void setPossibleAclChangesMap(TreeMap<WebState, TreeSet<SPDocument>> map) {
     possibleAclChanges = map;
+  }
+
+  public void setUrlToChecksumMap(HashMap<String, String> map) {
+    urlToChecksum = map;
+  }
+
+  public void setUrlVisitCountMap(HashMap<String, Integer> map) {
+    urlVisitCount = map;
   }
 
   /**

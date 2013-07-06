@@ -38,10 +38,14 @@ import com.google.enterprise.connector.spiimpl.BooleanValue;
 import com.google.enterprise.connector.spiimpl.DateValue;
 import com.google.enterprise.connector.spiimpl.StringValue;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.io.IOUtils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.text.Collator;
@@ -893,5 +897,40 @@ public class SPDocument implements Document, Comparable<SPDocument> {
 
   public void setRenamedFolder(Folder renamedFolder) {
     this.renamedFolder = renamedFolder;
+  }
+
+  public String getChecksum() throws Exception {
+    final String defaultEncoding = "UTF-8";
+    ByteArrayOutputStream oss = new ByteArrayOutputStream(); // TODO Any hint for the constructor ?
+    if (getAuthor() != null)
+      oss.write(getAuthor().getBytes(defaultEncoding));
+    if (title != null)
+      oss.write(title.getBytes(defaultEncoding));
+    if (downloadContents() == SPConstants.CONNECTIVITY_SUCCESS) {
+      // even if the return code is SUCCESS it may have discarded the
+      // stream because of mimetype support
+      if (content != null) {
+        oss.write(IOUtils.toByteArray(content));
+        content.close();
+      }
+      content = null;
+      content_type = null;
+    }
+    // ACL users
+    if (usersAclMap != null) {
+      // should we make sure that these entries are sorted ?
+      for (String user : usersAclMap.keySet()) 
+        oss.write(user.getBytes(defaultEncoding));
+    }
+
+    // ACL groups
+    if (groupsAclMap != null) {
+      // should we make sure that these entries are sorted ?
+      for (String group : groupsAclMap.keySet())
+        oss.write(group.getBytes(defaultEncoding));
+    }
+    // TODO Should we consider the elements in the 'attrs' list ?
+
+    return DigestUtils.sha1Hex(oss.toByteArray());
   }
 }

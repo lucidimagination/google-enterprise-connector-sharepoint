@@ -97,6 +97,7 @@ public class SharepointConnector implements Connector,
 	private ConnectorNamesDAO connectorNamesDAO;
 	private String connectorName;
 	private UserDataStoreDAO userDataStoreDAO;
+  private int visitsPerUrl = 10;
 
 	private volatile boolean stopTraversal;
 
@@ -793,4 +794,12 @@ public class SharepointConnector implements Connector,
 		this.userDataStoreDAO = userDataStoreDAO;
 	}
 
+  public void setVisitsPerUrl(int visitsPerUrl) {
+    if (visitsPerUrl == 0) ++visitsPerUrl;
+    this.visitsPerUrl = visitsPerUrl;
+  }
+
+  public int getVisitsPerUrl() {
+    return visitsPerUrl;
+  }
 }

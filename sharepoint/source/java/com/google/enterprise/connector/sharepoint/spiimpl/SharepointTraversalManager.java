@@ -70,6 +70,9 @@ public class SharepointTraversalManager implements TraversalManager,
   private TreeMap<WebState, TreeSet<SPDocument>> possibleAclChanges =
       new TreeMap<WebState, TreeSet<SPDocument>>();
 
+  private HashMap<String, String> urlToChecksum = new HashMap<String, String>();
+  private HashMap<String, Integer> urlVisitCount = new HashMap<String, Integer>();
+
   // The traversal context instance
   private TraversalContext traversalContext;
 
@@ -212,6 +215,9 @@ public class SharepointTraversalManager implements TraversalManager,
     sharepointClient.setVsChangedListsSet(vsChangedLists);
     sharepointClient.setDefaultUrlsSet(defaultUrlsSet);
     sharepointClient.setPossibleAclChangesMap(possibleAclChanges);
+
+    sharepointClient.setUrlToChecksumMap(urlToChecksum);
+    sharepointClient.setUrlVisitCountMap(urlVisitCount);
 
     sharepointClientContext.setBatchHint(hint);
     SPDocumentList rsAll = null;
