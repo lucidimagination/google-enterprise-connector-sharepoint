@@ -29,6 +29,7 @@
     <property name="feedUnPublishedDocuments" value="${feedUnPublishedDocuments}"/>
 
     <property name="visitsPerUrl" value="${visitsPerUrl}"/>
+    <property name="useChecksumDetection" value="${useChecksumDetection}"/>
 
     <property name="included_metadata">
     <list>

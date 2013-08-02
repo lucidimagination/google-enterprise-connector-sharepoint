@@ -325,19 +325,21 @@ public class SharepointClient {
       while (iter.hasNext()) {
         SPDocument doc = iter.next();
         if (!ActionType.ADD.equals(doc.getAction())) continue;
-        try {
-          String checksum = doc.getChecksum();
-          LOGGER.info(doc.getUrl() + " -> " + checksum);
-          if (!checksum.equals(urlToChecksum.get(doc.getUrl()))) {
-            // valid change
-            urlToChecksum.put(doc.getUrl(), checksum);
-            urlVisitCount.put(doc.getUrl(), 0);
-          } else {
-            LOGGER.info("Ignoring change, checksums are identical.");
+        if (sharepointConnector.isUseChecksumDetection()) {
+          try {
+            String checksum = doc.getChecksum();
+            LOGGER.info(doc.getUrl() + " -> " + checksum);
+            if (!checksum.equals(urlToChecksum.get(doc.getUrl()))) {
+              // valid change
+              urlToChecksum.put(doc.getUrl(), checksum);
+              urlVisitCount.put(doc.getUrl(), 0);
+            } else {
+              LOGGER.info("Ignoring change, checksums are identical.");
+            }
+          } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "Error while computing checksum for doc [ "
+                + doc.getUrl() + " ]", ex);
           }
-        } catch (Exception ex) {
-          LOGGER.log(Level.WARNING, "Error while computing checksum for doc [ "
-              + doc.getUrl() + " ]", ex);
         }
       }
     }

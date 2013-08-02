@@ -98,6 +98,7 @@ public class SharepointConnector implements Connector,
 	private String connectorName;
 	private UserDataStoreDAO userDataStoreDAO;
   private int visitsPerUrl = 10;
+  private boolean useChecksumDetection = false;
 
 	private volatile boolean stopTraversal;
 
@@ -801,5 +802,13 @@ public class SharepointConnector implements Connector,
 
   public int getVisitsPerUrl() {
     return visitsPerUrl;
+  }
+
+  public void setUseChecksumDetection(boolean useChecksumDetection) {
+    this.useChecksumDetection = useChecksumDetection;
+  }
+
+  public boolean isUseChecksumDetection() {
+    return useChecksumDetection;
   }
 }

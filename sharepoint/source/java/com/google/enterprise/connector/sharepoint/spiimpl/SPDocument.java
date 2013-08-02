@@ -906,16 +906,6 @@ public class SPDocument implements Document, Comparable<SPDocument> {
       oss.write(getAuthor().getBytes(defaultEncoding));
     if (title != null)
       oss.write(title.getBytes(defaultEncoding));
-    if (downloadContents() == SPConstants.CONNECTIVITY_SUCCESS) {
-      // even if the return code is SUCCESS it may have discarded the
-      // stream because of mimetype support
-      if (content != null) {
-        oss.write(IOUtils.toByteArray(content));
-        content.close();
-      }
-      content = null;
-      content_type = null;
-    }
     // ACL users
     if (usersAclMap != null) {
       // should we make sure that these entries are sorted ?
@@ -929,6 +919,8 @@ public class SPDocument implements Document, Comparable<SPDocument> {
       for (String group : groupsAclMap.keySet())
         oss.write(group.getBytes(defaultEncoding));
     }
+    if (fileSize == -1) LOGGER.info("fileSize is -1 for docUrl: " + getUrl());
+    else oss.write(fileSize);
     // TODO Should we consider the elements in the 'attrs' list ?
 
     return DigestUtils.sha1Hex(oss.toByteArray());
