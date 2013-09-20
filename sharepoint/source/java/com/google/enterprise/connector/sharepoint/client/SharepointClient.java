@@ -156,16 +156,18 @@ public class SharepointClient {
 
       // If the number of times we have visited this particular
       // url equals the maximum allowed number then ignore it
-      int visitsSoFar = urlVisitCount.containsKey(doc.getUrl()) ?
-          urlVisitCount.get(doc.getUrl()) : 0;
+      
+      String docUrl = doc.getAction() == ActionType.DELETE ? doc.getDocId() : doc.getUrl();
+      
+      int visitsSoFar = urlVisitCount.containsKey(docUrl) ? urlVisitCount.get(docUrl) : 0;
       if (visitsSoFar < sharepointConnector.getVisitsPerUrl()) {
         newlist.add(doc);
-        urlVisitCount.put(doc.getUrl(), visitsSoFar+1);
+        urlVisitCount.put(docUrl, visitsSoFar+1);
         LOGGER.log(Level.FINEST, "[ DocId = " + doc.getDocId() + ", URL = "
-            + doc.getUrl() + " ]");
+            + docUrl + " ]");
       } else {
         LOGGER.info("Ignoring [ DocId = " + doc.getDocId() + ", URL = "
-            + doc.getUrl() + " ], it has been crawled enough times.");
+            + docUrl + " ], it has been crawled enough times.");
       }
     }
 

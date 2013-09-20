@@ -138,6 +138,8 @@
                 <prop key="initialCacheSize">1000</prop>
                 <prop key="cacheRefreshInterval">7200</prop>
                 <prop key="feedUnPublishedDocuments">true</prop>
+                <prop key="visitsPerUrl">10</prop>
+				<prop key="useChecksumDetection">false</prop>
             </props>
         </property>
     </bean>
