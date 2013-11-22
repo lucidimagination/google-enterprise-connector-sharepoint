@@ -40,6 +40,8 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Represents a SharePoint Web Site as a stateful object
@@ -51,6 +53,8 @@ public class WebState implements StatefulObject {
   private String webId = null;
   private String title = "No Title";
   private DateTime insertionTime = null;
+  private Set<String> currentListsSet = new HashSet<String>();
+
 
   // By default mark all web state as exisitng when they are created.
   private boolean exists = true;
@@ -292,6 +296,31 @@ public class WebState implements StatefulObject {
    */
   public void setAllListStateSet(final TreeSet<ListState> inAllListStateSet) {
     allListStateSet = inAllListStateSet;
+  }
+  
+  /**
+   * @param url from ListState
+   */
+  public void addCurrentListSet(String key)
+  {
+	  currentListsSet.add(key);
+  }
+  
+  /**
+   * @return return true if currentListsSet has the URL
+   */
+  public boolean CurrentListSetHas(String key)
+  {
+	  return currentListsSet.contains(key);
+  }
+  
+  /**
+   * @return return true if currentListsSet has the URL
+   */
+  public void removeStateInWebState(final ListState state)
+  {
+	  allListStateSet.remove(state);  
+	  keyMap.remove(state.getPrimaryKey());
   }
 
   /**

@@ -64,6 +64,8 @@ public class GlobalState {
   private boolean recrawling = false;
   private String workDir = null;
   private FeedType feedType;
+  private final StringBuilder characters = new StringBuilder(100);
+
   /**
    * To keep track of WebStates, we keep two data structures: a TreeSet relying
    * on the insertion time property of a StatefulObject, and a HashMap on the
@@ -89,7 +91,7 @@ public class GlobalState {
   // This enum is a list of all such nodes whose values are stored as
   // inner test in the node.
   enum Nodes {
-    FOLDERS_EXTRAID, ATTACHMENTS_EXTRAID, ALERTS_EXTRAID;
+    FOLDERS_EXTRAID, ATTACHMENTS_EXTRAID, ALERTS_EXTRAID, COLUMNS_EXTRAID, COLUMNS_DELETED_EXTRAID;
   }
 
   /**
@@ -218,7 +220,12 @@ public class GlobalState {
         currentNode = Nodes.ATTACHMENTS_EXTRAID;
       } else if (SPConstants.STATE_EXTRAIDS_ALERTS.equals(localName)) {
         currentNode = Nodes.ALERTS_EXTRAID;
-      } else if (SPConstants.WEB_STATE.equals(localName)) {
+      } else if (SPConstants.LIST_COLUMNS.equals(localName)) {
+        currentNode = Nodes.COLUMNS_EXTRAID;
+      } else if (SPConstants.LIST_COLUMNS_DELETED.equals(localName)) {
+        currentNode = Nodes.COLUMNS_DELETED_EXTRAID;
+      } 
+      else if (SPConstants.WEB_STATE.equals(localName)) {
         try {
           web = WebState.loadStateFromXML(atts);
           addOrUpdateWebStateInGlobalState(web);
@@ -251,7 +258,15 @@ public class GlobalState {
         list = null;
       } else if (SPConstants.WEB_STATE.equals(localName)) {
         web = null;
+      }else if (SPConstants.COLUMN.equals(localName)) {
+    	  final String chrs = characters.toString().trim();
+    	  if(Nodes.COLUMNS_EXTRAID.equals(currentNode))
+    		  list.getListColumns().add(chrs);
+    	  else if(Nodes.COLUMNS_DELETED_EXTRAID.equals(currentNode))
+    		  list.getListColumnsDeleted().add(chrs);
+          characters.setLength(0);
       }
+      
     }
 
     public void characters(char[] ch, int start, int end) throws SAXException {
@@ -267,7 +282,12 @@ public class GlobalState {
         list.getIDs().append(ch, start, end);
       } else if (Nodes.ATTACHMENTS_EXTRAID.equals(currentNode)) {
         list.getAttchmnts().append(ch, start, end);
+      } else if (Nodes.COLUMNS_EXTRAID.equals(currentNode)){
+    	characters.append(new String(ch,start,end));
+      } else if (Nodes.COLUMNS_DELETED_EXTRAID.equals(currentNode)){
+      	characters.append(new String(ch,start,end));
       }
+      
     }
 
     public void ignorableWhitespace(char[] ch, int start, int end)

@@ -83,7 +83,8 @@ public class ListsWS {
   private String endpoint;
   private ListsSoap_BindingStub stub = null;
   private String rowLimit = SPConstants.DEFAULT_ROWLIMIT;
-
+  private Set<String> ListColumns;
+  private Set<String> deletedColumns;
   /**
    * @param inSharepointClientContext The Context is passed so that necessary
    *          information can be used to create the instance of current class
@@ -95,6 +96,8 @@ public class ListsWS {
       throws SharepointException {
 
     if (inSharepointClientContext != null) {
+      ListColumns = new HashSet<String>();
+	  deletedColumns = new HashSet<String>();
       sharepointClientContext = inSharepointClientContext;
 
       if (inSharepointClientContext.getBatchHint() > 0) {
@@ -314,6 +317,7 @@ public class ListsWS {
 
     String strMyString = "<Query/>";// empty Query String
 
+    
     if (((date == null) || (listItemID == null))) {
       LOGGER.config("Initial case ...");
       strMyString = ""
@@ -540,6 +544,7 @@ public class ListsWS {
   public List<SPDocument> getListItems(final ListState list,
       final Calendar lastModified, final String lastItemID,
       final Set<String> allWebs) {
+
     final ArrayList<SPDocument> listItems = new ArrayList<SPDocument>();
     if (list == null) {
       LOGGER.warning("Unable to get the list items because list is null");
@@ -605,9 +610,10 @@ public class ListsWS {
           + listName + " ].", e);
     }
 
-    if (res != null) {
-      final MessageElement[] me = res.get_any();
 
+    if (res != null) {
+
+      final MessageElement[] me = res.get_any();
       if ((me != null) && (me.length > 0)) {
         for (final Iterator itChilds = me[0].getChildElements(); itChilds.hasNext();) {
           final MessageElement child = (MessageElement) itChilds.next();
@@ -1782,7 +1788,7 @@ public class ListsWS {
             // normalizing the values
             strAttrName = Util.normalizeMetadataName(strAttrName);
             strAttrValue = Util.normalizeMetadataValue(strAttrValue);
-            if (sharepointClientContext.isIncludeMetadata(strAttrName)) {
+			if (sharepointClientContext.isIncludeMetadata(strAttrName) && !deletedColumns.contains(strAttrName)) {
               doc.setAttribute(strAttrName, strAttrValue);
             } else {
               LOGGER.log(Level.FINE, "Excluding metadata name [ " + strAttrName
@@ -1844,4 +1850,65 @@ public class ListsWS {
     }
     return parseCustomWSResponseForListItemNodes(wsElement, list);
   }
+  
+	public void getListsColumnsFromSharePoint(ListState list) {
+		ListColumns.clear();
+		try {
+			String currentModified="";
+			final MessageElement[] myList = stub.getList( list.getPrimaryKey()).get_any();
+			for (final Iterator itChilds = myList[0].getChildElements(); itChilds
+					.hasNext();) {
+				currentModified = myList[0].getAttribute("Modified");
+				LOGGER.info("list modified at:" +  currentModified);
+				final MessageElement child = (MessageElement) itChilds.next();
+				for (final Iterator itrchild = child.getChildElements(); itrchild
+						.hasNext();) {
+					MessageElement oneAttr = (MessageElement) itrchild.next();
+					if (oneAttr != null) {
+						String ListColumnName = oneAttr.getAttribute("Name");
+						if(ListColumnName!=null && ListColumnName!="")
+						ListColumns.add(ListColumnName);
+					}
+					
+				}
+			}
+			
+			
+		} catch (Exception e) {
+			 LOGGER.info("Error Obtaining columns from SharePoint");
+		}
+	}
+	
+	public void setListColumnsInState(ListState list) {
+		list.setListColumns(ListColumns);		
+	}
+	
+	public Set<String> getListColumns() {
+		return ListColumns;
+	}
+
+	public void setListColumns(Set<String> listColumns) {
+		ListColumns = listColumns;
+	}
+	
+	public boolean CompareListsColumns(Set<String> listColumnsWS,Set<String> listColumnsState) {
+		return (listColumnsWS.containsAll(listColumnsState) && listColumnsState.size()==listColumnsWS.size());
+	}
+	
+	public void setDeletedColumns(ListState list) {
+		deletedColumns = list.getListColumnsDeleted();
+		if(ListColumns.size() < list.getListColumns().size()){
+			for(String column:list.getListColumns()){
+				if(!ListColumns.contains(column))
+					deletedColumns.add(column);
+				}
+		}
+		if(ListColumns.size() > list.getListColumns().size()){
+			for(String column:ListColumns){
+				if(!list.getListColumns().contains(column) && deletedColumns.contains(column))
+					deletedColumns.remove(column);
+				}
+		}
+		list.setListColumnsDeleted(deletedColumns);
+	}
 }

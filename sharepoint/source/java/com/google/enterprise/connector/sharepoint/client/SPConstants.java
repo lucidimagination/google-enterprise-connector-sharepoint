@@ -315,6 +315,11 @@ public class SPConstants {
   public static final String STATE_ATTR_IDREF = "IDREF";
   public static final String STATE_NOCRAWL = "NoCrawl";
   public static final String STATE_CRAWLASPXPAGES = "CrawlASPXPages";
+  public static final String LIST_COLUMNS = "ListColumns";
+  public static final String LIST_COLUMNS_DELETED = "ListColumnsDeleted";
+  public static final String COLUMN = "Column";
+  
+  
   // To persist the list of renamed folders that need to be processed on
   // connector restart
   public static final String STATE_RENAMED_FOLDER_LIST = "RenamedFolderList";

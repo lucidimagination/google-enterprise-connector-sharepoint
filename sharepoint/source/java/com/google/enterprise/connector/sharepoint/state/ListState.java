@@ -49,6 +49,8 @@ import java.util.regex.Pattern;
  */
 public class ListState implements StatefulObject {
   protected String key = null;
+  private Set<String> ListColumns = new HashSet<String>();
+  private Set<String> ListColumnsDeleted = new HashSet<String>();
 
   /**
    * Whether the underlying SharePoint object that this object was created to
@@ -389,6 +391,22 @@ public class ListState implements StatefulObject {
    */
   public void setExisting(boolean existing) {
     exists = existing;
+  }
+  
+  public Set<String> getListColumns() {
+		return ListColumns;
+  }
+
+  public void setListColumns(Set<String> listColumns) {
+		ListColumns = listColumns;
+  }
+  
+  public Set<String> getListColumnsDeleted() {
+		return ListColumnsDeleted;
+  }
+
+  public void setListColumnsDeleted(Set<String> listColumnsDeleted) {
+	  ListColumnsDeleted = listColumnsDeleted;
   }
 
   /**
@@ -1294,6 +1312,35 @@ public class ListState implements StatefulObject {
         handler.endElement("", "", SPConstants.STATE_LASTDOCCRAWLED);
       }
 
+      atts.clear();
+      handler.startElement("", "", SPConstants.LIST_COLUMNS, atts);
+      if(ListColumns!=null){
+    	  for (String Column : ListColumns) {
+    		  if(Column!=null){
+    			  handler.startElement("", "", SPConstants.COLUMN, atts);
+    			  handler.characters(Column.toCharArray(),0,Column.length());
+    			  handler.endElement("", "",  SPConstants.COLUMN);
+    			  }
+    		  }
+    	  }
+      
+      handler.endElement("", "", SPConstants.LIST_COLUMNS);
+      
+      
+      handler.startElement("", "", SPConstants.LIST_COLUMNS_DELETED, atts);
+      if(ListColumnsDeleted!=null){
+    	  for (String Column : ListColumnsDeleted) {
+    		  if(Column!=null){
+    			  handler.startElement("", "", SPConstants.COLUMN, atts);
+    			  handler.characters(Column.toCharArray(),0,Column.length());
+    			  handler.endElement("", "",  SPConstants.COLUMN);
+    			  }
+    		  }
+    	  }
+      
+      handler.endElement("", "", SPConstants.LIST_COLUMNS_DELETED);
+      
+      
       // Dump the renamed folder list that have been processed so far
       dumpRenamedFolderList(handler);
     }

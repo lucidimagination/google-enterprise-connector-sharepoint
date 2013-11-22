@@ -1165,6 +1165,23 @@ public class SharepointClient {
           }
         }
       } else {
+    	  listsWS.getListsColumnsFromSharePoint(listState);
+      	  if(listState.getListColumns().size() == 0){
+      		  listsWS.setListColumnsInState(listState); 
+      	  }
+      	  if( !webState.CurrentListSetHas(listState.getListURL())){
+      		  boolean columnsNotChanged = listsWS.CompareListsColumns(listsWS.getListColumns(),listState.getListColumns());
+      		  LOGGER.info("size from columns in memory: "+listsWS.getListColumns().size()+"size from columns in file: "+listState.getListColumns().size());
+      		  if(!columnsNotChanged){
+      			  LOGGER.info("updating columns ....");
+            	  listsWS.setDeletedColumns(listState);
+      			  webState.removeStateInWebState(listState);
+      			  updateWhenChangeColumns(listState,listsWS,webState,currentList,listItems,allWebs);
+      			  webState.addCurrentListSet(listState.getListURL());
+      			  listsWS.setListColumnsInState(listState);  
+      			  }
+      		  }   
+      	  
         LOGGER.info("revisiting listState [ " + listState.getListURL() + " ]. ");
         listState.setExisting(true);
         listState.setNextPage(null);
@@ -1636,4 +1653,75 @@ public class SharepointClient {
       dummySiteListState.setCrawlQueue(documentList);
     }
   }
+  
+  public void updateWhenChangeColumns(ListState listState,ListsWS listsWS,
+		  WebState webState,ListState currentList,List<SPDocument> listItems,Set<String> allWebs){
+	ListState prevState = listState;
+    listState = currentList;
+    listState.setNewList(true);
+
+      LOGGER.info("NextChangeToken of " + listState.getListURL() + " = "
+          + listState.getNextChangeTokenForSubsequectWSCalls());
+      
+      vsChangedLists.remove(listState.getPrimaryKey());
+      webState.AddOrUpdateListStateInWebState(prevState, listState.getLastMod());
+      listState = prevState;
+      listState.setChangeTokenForWSCall(null);
+      vsChangedLists.remove(listState.getPrimaryKey());
+
+      // Should not happen
+      if (prevState == null)
+        LOGGER.info("SERIOUS ERROR");
+
+    if (SPType.SP2007 == webState.getSharePointType()) {
+      if (FeedType.CONTENT_FEED == sharepointClientContext.getFeedType()) {
+        // In case of content feed, we need to keep track of
+        // folders and the items under that. This is required
+        // for sending delete feeds for the documents when their
+        // parent folder is deleted.
+        LOGGER.log(Level.CONFIG, "Discovering all folders under current list/library [ "
+            + listState.getListURL() + " ] ");
+        try {
+          listsWS.getSubFoldersRecursively(listState, null, null);
+        } catch (final Exception e) {
+          LOGGER.log(Level.WARNING, "Exception occured while getting the folders hierarchy for list [ "
+              + listState.getListURL() + " ]. ", e);
+        } catch (final Throwable t) {
+          LOGGER.log(Level.WARNING, "Error occured while getting the folders hierarchy for list [ "
+              + listState.getListURL() + " ]. ", t);
+        }
+      }
+
+      try {
+
+          String prevRowLimit = listsWS.getRowLimitForWs();
+          listsWS.setRowLimitForWs("10000");
+          List<SPDocument> items = listsWS.getListItems(listState, null, null, allWebs);
+          listItems = fetchBatch(items);
+          pendingDocsPerList.put(listState.getListURL(), items);
+          ArrayList<Attribute> attrs = listState.getAttrs();
+          for (Object element : attrs) {
+              final Attribute attr = (Attribute) element;
+              LOGGER.info("************ Name: "+attr.getName() + " value:" + attr.getValue()+" classname:"+attr.getValue().getClass().getName());
+     
+            }
+          listsWS.setRowLimitForWs(prevRowLimit);
+        
+      } catch (final Exception e) {
+        LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
+            + listState.getListURL() + " ].", e);
+      } catch (final Throwable t) {
+        LOGGER.log(Level.WARNING, "Error thrown while getting the documents under list [ "
+            + listState.getListURL() + " ].", t);
+      }
+    } else {
+      try {
+        listItems = listsWS.getListItems(listState, null, null, allWebs);
+      } catch (final Exception e) {
+        LOGGER.log(Level.WARNING, "Exception thrown while getting the documents under list [ "
+            + listState.getListURL() + " ].", e);
+      }
+    }
+  }
+
 }
