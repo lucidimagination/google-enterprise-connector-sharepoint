@@ -1171,9 +1171,9 @@ public class SharepointClient {
       	  }
       	  if( !webState.CurrentListSetHas(listState.getListURL())){
       		  boolean columnsNotChanged = listsWS.CompareListsColumns(listsWS.getListColumns(),listState.getListColumns());
-      		  LOGGER.info("size from columns in memory: "+listsWS.getListColumns().size()+"size from columns in file: "+listState.getListColumns().size());
+      		  LOGGER.log(Level.FINEST,"size from columns in memory: "+listsWS.getListColumns().size()+"size from columns in file: "+listState.getListColumns().size());
       		  if(!columnsNotChanged){
-      			  LOGGER.info("updating columns ....");
+      			LOGGER.log(Level.FINEST,"updating columns ...");
             	  listsWS.setDeletedColumns(listState);
       			  webState.removeStateInWebState(listState);
       			  updateWhenChangeColumns(listState,listsWS,webState,currentList,listItems,allWebs);
@@ -1701,9 +1701,7 @@ public class SharepointClient {
           pendingDocsPerList.put(listState.getListURL(), items);
           ArrayList<Attribute> attrs = listState.getAttrs();
           for (Object element : attrs) {
-              final Attribute attr = (Attribute) element;
-              LOGGER.info("************ Name: "+attr.getName() + " value:" + attr.getValue()+" classname:"+attr.getValue().getClass().getName());
-     
+              final Attribute attr = (Attribute) element;  
             }
           listsWS.setRowLimitForWs(prevRowLimit);
         

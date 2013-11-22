@@ -49,8 +49,8 @@ import java.util.regex.Pattern;
  */
 public class ListState implements StatefulObject {
   protected String key = null;
-  private Set<String> ListColumns = new HashSet<String>();
-  private Set<String> ListColumnsDeleted = new HashSet<String>();
+  private Set<String> listColumns = new HashSet<String>();
+  private Set<String> listColumnsDeleted = new HashSet<String>();
 
   /**
    * Whether the underlying SharePoint object that this object was created to
@@ -394,19 +394,19 @@ public class ListState implements StatefulObject {
   }
   
   public Set<String> getListColumns() {
-		return ListColumns;
+		return listColumns;
   }
 
   public void setListColumns(Set<String> listColumns) {
-		ListColumns = listColumns;
+	  this.listColumns = listColumns;
   }
   
   public Set<String> getListColumnsDeleted() {
-		return ListColumnsDeleted;
+		return listColumnsDeleted;
   }
 
   public void setListColumnsDeleted(Set<String> listColumnsDeleted) {
-	  ListColumnsDeleted = listColumnsDeleted;
+	  this.listColumnsDeleted = listColumnsDeleted;
   }
 
   /**
@@ -1314,8 +1314,8 @@ public class ListState implements StatefulObject {
 
       atts.clear();
       handler.startElement("", "", SPConstants.LIST_COLUMNS, atts);
-      if(ListColumns!=null){
-    	  for (String Column : ListColumns) {
+      if(listColumns!=null){
+    	  for (String Column : listColumns) {
     		  if(Column!=null){
     			  handler.startElement("", "", SPConstants.COLUMN, atts);
     			  handler.characters(Column.toCharArray(),0,Column.length());
@@ -1328,8 +1328,8 @@ public class ListState implements StatefulObject {
       
       
       handler.startElement("", "", SPConstants.LIST_COLUMNS_DELETED, atts);
-      if(ListColumnsDeleted!=null){
-    	  for (String Column : ListColumnsDeleted) {
+      if(listColumnsDeleted!=null){
+    	  for (String Column : listColumnsDeleted) {
     		  if(Column!=null){
     			  handler.startElement("", "", SPConstants.COLUMN, atts);
     			  handler.characters(Column.toCharArray(),0,Column.length());

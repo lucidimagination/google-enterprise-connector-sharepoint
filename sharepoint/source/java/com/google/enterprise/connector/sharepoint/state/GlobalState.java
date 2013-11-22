@@ -64,7 +64,7 @@ public class GlobalState {
   private boolean recrawling = false;
   private String workDir = null;
   private FeedType feedType;
-  private final StringBuilder characters = new StringBuilder(100);
+  private final StringBuilder characters = new StringBuilder();
 
   /**
    * To keep track of WebStates, we keep two data structures: a TreeSet relying

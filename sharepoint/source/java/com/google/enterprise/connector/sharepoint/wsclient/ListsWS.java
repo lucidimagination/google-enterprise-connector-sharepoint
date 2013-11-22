@@ -83,7 +83,7 @@ public class ListsWS {
   private String endpoint;
   private ListsSoap_BindingStub stub = null;
   private String rowLimit = SPConstants.DEFAULT_ROWLIMIT;
-  private Set<String> ListColumns;
+  private Set<String> listColumns;
   private Set<String> deletedColumns;
   /**
    * @param inSharepointClientContext The Context is passed so that necessary
@@ -96,7 +96,7 @@ public class ListsWS {
       throws SharepointException {
 
     if (inSharepointClientContext != null) {
-      ListColumns = new HashSet<String>();
+      listColumns = new HashSet<String>();
 	  deletedColumns = new HashSet<String>();
       sharepointClientContext = inSharepointClientContext;
 
@@ -1852,14 +1852,14 @@ public class ListsWS {
   }
   
 	public void getListsColumnsFromSharePoint(ListState list) {
-		ListColumns.clear();
+		listColumns.clear();
 		try {
 			String currentModified="";
 			final MessageElement[] myList = stub.getList( list.getPrimaryKey()).get_any();
 			for (final Iterator itChilds = myList[0].getChildElements(); itChilds
 					.hasNext();) {
 				currentModified = myList[0].getAttribute("Modified");
-				LOGGER.info("list modified at:" +  currentModified);
+				LOGGER.log(Level.FINEST,"list modified at:" +  currentModified);
 				final MessageElement child = (MessageElement) itChilds.next();
 				for (final Iterator itrchild = child.getChildElements(); itrchild
 						.hasNext();) {
@@ -1867,7 +1867,7 @@ public class ListsWS {
 					if (oneAttr != null) {
 						String ListColumnName = oneAttr.getAttribute("Name");
 						if(ListColumnName!=null && ListColumnName!="")
-						ListColumns.add(ListColumnName);
+							listColumns.add(ListColumnName);
 					}
 					
 				}
@@ -1880,15 +1880,15 @@ public class ListsWS {
 	}
 	
 	public void setListColumnsInState(ListState list) {
-		list.setListColumns(ListColumns);		
+		list.setListColumns(listColumns);		
 	}
 	
 	public Set<String> getListColumns() {
-		return ListColumns;
+		return listColumns;
 	}
 
 	public void setListColumns(Set<String> listColumns) {
-		ListColumns = listColumns;
+		this.listColumns = listColumns;
 	}
 	
 	public boolean CompareListsColumns(Set<String> listColumnsWS,Set<String> listColumnsState) {
@@ -1897,14 +1897,14 @@ public class ListsWS {
 	
 	public void setDeletedColumns(ListState list) {
 		deletedColumns = list.getListColumnsDeleted();
-		if(ListColumns.size() < list.getListColumns().size()){
+		if(listColumns.size() < list.getListColumns().size()){
 			for(String column:list.getListColumns()){
-				if(!ListColumns.contains(column))
+				if(!listColumns.contains(column))
 					deletedColumns.add(column);
 				}
 		}
-		if(ListColumns.size() > list.getListColumns().size()){
-			for(String column:ListColumns){
+		if(listColumns.size() > list.getListColumns().size()){
+			for(String column:listColumns){
 				if(!list.getListColumns().contains(column) && deletedColumns.contains(column))
 					deletedColumns.remove(column);
 				}
