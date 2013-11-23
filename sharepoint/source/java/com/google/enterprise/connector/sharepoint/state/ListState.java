@@ -51,7 +51,7 @@ public class ListState implements StatefulObject {
   protected String key = null;
   private Set<String> listColumns = new HashSet<String>();
   private Set<String> listColumnsDeleted = new HashSet<String>();
-
+  private Set<String> listColumnsWS = new HashSet<String>();
   /**
    * Whether the underlying SharePoint object that this object was created to
    * represent actually exists. This variable is periodically set to false by
@@ -397,17 +397,25 @@ public class ListState implements StatefulObject {
 		return listColumns;
   }
 
-  public void setListColumns(Set<String> listColumns) {
-	  this.listColumns = listColumns;
+  public void setListColumns() {
+	  this.listColumns=listColumnsWS;
   }
   
   public Set<String> getListColumnsDeleted() {
-		return listColumnsDeleted;
+	  return listColumnsDeleted;
   }
 
   public void setListColumnsDeleted(Set<String> listColumnsDeleted) {
 	  this.listColumnsDeleted = listColumnsDeleted;
   }
+  
+  public Set<String> getListColumnsWS() {
+	return listColumnsWS;
+}
+
+public void setListColumnsWS(Set<String> listColumnsWS) {
+	this.listColumnsWS = listColumnsWS;
+}
 
   /**
    * Compares this ListState to another (for the Comparable interface).

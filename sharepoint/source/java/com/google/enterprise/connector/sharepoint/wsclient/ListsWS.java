@@ -83,8 +83,6 @@ public class ListsWS {
   private String endpoint;
   private ListsSoap_BindingStub stub = null;
   private String rowLimit = SPConstants.DEFAULT_ROWLIMIT;
-  private Set<String> listColumns;
-  private Set<String> deletedColumns;
   /**
    * @param inSharepointClientContext The Context is passed so that necessary
    *          information can be used to create the instance of current class
@@ -96,8 +94,6 @@ public class ListsWS {
       throws SharepointException {
 
     if (inSharepointClientContext != null) {
-      listColumns = new HashSet<String>();
-	  deletedColumns = new HashSet<String>();
       sharepointClientContext = inSharepointClientContext;
 
       if (inSharepointClientContext.getBatchHint() > 0) {
@@ -1788,7 +1784,7 @@ public class ListsWS {
             // normalizing the values
             strAttrName = Util.normalizeMetadataName(strAttrName);
             strAttrValue = Util.normalizeMetadataValue(strAttrValue);
-			if (sharepointClientContext.isIncludeMetadata(strAttrName) && !deletedColumns.contains(strAttrName)) {
+			if (sharepointClientContext.isIncludeMetadata(strAttrName) && !list.getListColumnsDeleted().contains(strAttrName)) {
               doc.setAttribute(strAttrName, strAttrValue);
             } else {
               LOGGER.log(Level.FINE, "Excluding metadata name [ " + strAttrName
@@ -1852,7 +1848,7 @@ public class ListsWS {
   }
   
 	public void getListsColumnsFromSharePoint(ListState list) {
-		listColumns.clear();
+		list.getListColumnsWS().clear();
 		try {
 			String currentModified="";
 			final MessageElement[] myList = stub.getList( list.getPrimaryKey()).get_any();
@@ -1867,48 +1863,38 @@ public class ListsWS {
 					if (oneAttr != null) {
 						String ListColumnName = oneAttr.getAttribute("Name");
 						if(ListColumnName!=null && ListColumnName!="")
-							listColumns.add(ListColumnName);
+							list.getListColumnsWS().add(ListColumnName);
 					}
 					
 				}
 			}
-			
-			
+						
 		} catch (Exception e) {
 			 LOGGER.info("Error Obtaining columns from SharePoint");
 		}
 	}
 	
 	public void setListColumnsInState(ListState list) {
-		list.setListColumns(listColumns);		
+		list.setListColumns();		
 	}
 	
-	public Set<String> getListColumns() {
-		return listColumns;
-	}
-
-	public void setListColumns(Set<String> listColumns) {
-		this.listColumns = listColumns;
-	}
-	
-	public boolean CompareListsColumns(Set<String> listColumnsWS,Set<String> listColumnsState) {
-		return (listColumnsWS.containsAll(listColumnsState) && listColumnsState.size()==listColumnsWS.size());
+	public boolean CompareListsColumns(ListState list) {
+		return (list.getListColumnsWS().containsAll(list.getListColumns()) && list.getListColumns().size()==list.getListColumnsWS().size());
 	}
 	
 	public void setDeletedColumns(ListState list) {
-		deletedColumns = list.getListColumnsDeleted();
-		if(listColumns.size() < list.getListColumns().size()){
+		if(list.getListColumnsWS().size() < list.getListColumns().size()){
 			for(String column:list.getListColumns()){
-				if(!listColumns.contains(column))
-					deletedColumns.add(column);
+				if(!list.getListColumnsWS().contains(column))
+					list.getListColumnsDeleted().add(column);
 				}
 		}
-		if(listColumns.size() > list.getListColumns().size()){
-			for(String column:listColumns){
-				if(!list.getListColumns().contains(column) && deletedColumns.contains(column))
-					deletedColumns.remove(column);
+		if(list.getListColumnsWS().size() > list.getListColumns().size()){
+			for(String column:list.getListColumnsWS()){
+				if(!list.getListColumns().contains(column) && list.getListColumnsDeleted().contains(column))
+					list.getListColumnsDeleted().remove(column);
 				}
 		}
-		list.setListColumnsDeleted(deletedColumns);
+
 	}
 }

@@ -180,7 +180,7 @@ public class WebState implements StatefulObject {
   public boolean isExisting() {
     return exists;
   }
-
+ 
   /**
    * Marks the Web as existing/non-existing
    */

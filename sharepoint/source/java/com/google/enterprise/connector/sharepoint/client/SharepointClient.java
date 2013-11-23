@@ -998,7 +998,6 @@ public class SharepointClient {
             + webState.getWebUrl() + " ] ", e);
       }
     }
-
     // Updating the latest metadata info for all list states. We may do this
     // updation when the crawl will begin; that will save this extra
     // iteration over the ListStates. But, there is one metadata which
@@ -1170,10 +1169,10 @@ public class SharepointClient {
       		  listsWS.setListColumnsInState(listState); 
       	  }
       	  if( !webState.CurrentListSetHas(listState.getListURL())){
-      		  boolean columnsNotChanged = listsWS.CompareListsColumns(listsWS.getListColumns(),listState.getListColumns());
-      		  LOGGER.log(Level.FINEST,"size from columns in memory: "+listsWS.getListColumns().size()+"size from columns in file: "+listState.getListColumns().size());
+      		  boolean columnsNotChanged = listsWS.CompareListsColumns(listState);
+      		  LOGGER.log(Level.FINEST,"size from columns in memory: "+listState.getListColumnsWS().size()+"size from columns in file: "+listState.getListColumns().size());
       		  if(!columnsNotChanged){
-      			LOGGER.log(Level.FINEST,"updating columns ...");
+      			 LOGGER.log(Level.FINEST,"updating columns ...");
             	  listsWS.setDeletedColumns(listState);
       			  webState.removeStateInWebState(listState);
       			  updateWhenChangeColumns(listState,listsWS,webState,currentList,listItems,allWebs);

@@ -65,7 +65,6 @@ public class GlobalState {
   private String workDir = null;
   private FeedType feedType;
   private final StringBuilder characters = new StringBuilder();
-
   /**
    * To keep track of WebStates, we keep two data structures: a TreeSet relying
    * on the insertion time property of a StatefulObject, and a HashMap on the
