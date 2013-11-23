@@ -1847,8 +1847,8 @@ public class ListsWS {
     return parseCustomWSResponseForListItemNodes(wsElement, list);
   }
   
-	public void getListsColumnsFromSharePoint(ListState list) {
-		list.getListColumnsWS().clear();
+	public Set<String> getListsColumnsFromSharePoint(ListState list) {
+		Set<String> listColumnsWS = new HashSet<String>();
 		try {
 			String currentModified="";
 			final MessageElement[] myList = stub.getList( list.getPrimaryKey()).get_any();
@@ -1863,7 +1863,7 @@ public class ListsWS {
 					if (oneAttr != null) {
 						String ListColumnName = oneAttr.getAttribute("Name");
 						if(ListColumnName!=null && ListColumnName!="")
-							list.getListColumnsWS().add(ListColumnName);
+							listColumnsWS.add(ListColumnName);
 					}
 					
 				}
@@ -1872,25 +1872,22 @@ public class ListsWS {
 		} catch (Exception e) {
 			 LOGGER.info("Error Obtaining columns from SharePoint");
 		}
+		return listColumnsWS;
 	}
 	
-	public void setListColumnsInState(ListState list) {
-		list.setListColumns();		
+	public boolean CompareListsColumns(ListState list,Set<String> listColumnsWS) {
+		return (listColumnsWS.containsAll(list.getListColumns()) && list.getListColumns().size()==listColumnsWS.size());
 	}
 	
-	public boolean CompareListsColumns(ListState list) {
-		return (list.getListColumnsWS().containsAll(list.getListColumns()) && list.getListColumns().size()==list.getListColumnsWS().size());
-	}
-	
-	public void setDeletedColumns(ListState list) {
-		if(list.getListColumnsWS().size() < list.getListColumns().size()){
+	public void setDeletedColumns(ListState list,Set<String> listColumnsWS) {
+		if(listColumnsWS.size() < list.getListColumns().size()){
 			for(String column:list.getListColumns()){
-				if(!list.getListColumnsWS().contains(column))
+				if(!listColumnsWS.contains(column))
 					list.getListColumnsDeleted().add(column);
 				}
 		}
-		if(list.getListColumnsWS().size() > list.getListColumns().size()){
-			for(String column:list.getListColumnsWS()){
+		if(listColumnsWS.size() > list.getListColumns().size()){
+			for(String column:listColumnsWS){
 				if(!list.getListColumns().contains(column) && list.getListColumnsDeleted().contains(column))
 					list.getListColumnsDeleted().remove(column);
 				}

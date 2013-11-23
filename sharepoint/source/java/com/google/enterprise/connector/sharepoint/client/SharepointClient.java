@@ -1164,22 +1164,22 @@ public class SharepointClient {
           }
         }
       } else {
-    	  listsWS.getListsColumnsFromSharePoint(listState);
+    	  Set<String> listColumnsWS = listsWS.getListsColumnsFromSharePoint(listState);
       	  if(listState.getListColumns().size() == 0){
-      		  listsWS.setListColumnsInState(listState); 
+      		  listState.setListColumns(listColumnsWS);
       	  }
       	  if( !webState.CurrentListSetHas(listState.getListURL())){
-      		  boolean columnsNotChanged = listsWS.CompareListsColumns(listState);
-      		  LOGGER.log(Level.FINEST,"size from columns in memory: "+listState.getListColumnsWS().size()+"size from columns in file: "+listState.getListColumns().size());
+      		  boolean columnsNotChanged = listsWS.CompareListsColumns(listState,listColumnsWS);
+      		  LOGGER.log(Level.FINEST,"size from columns in memory: "+listColumnsWS.size()+"size from columns in file: "+listState.getListColumns().size());
       		  if(!columnsNotChanged){
-      			 LOGGER.log(Level.FINEST,"updating columns ...");
-            	  listsWS.setDeletedColumns(listState);
+      			  LOGGER.log(Level.FINEST,"updating columns ...");
+            	  listsWS.setDeletedColumns(listState,listColumnsWS);
       			  webState.removeStateInWebState(listState);
       			  updateWhenChangeColumns(listState,listsWS,webState,currentList,listItems,allWebs);
       			  webState.addCurrentListSet(listState.getListURL());
-      			  listsWS.setListColumnsInState(listState);  
-      			  }
-      		  }   
+      			  listState.setListColumns(listColumnsWS);
+      		  }
+      	   }   
       	  
         LOGGER.info("revisiting listState [ " + listState.getListURL() + " ]. ");
         listState.setExisting(true);
