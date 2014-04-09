@@ -54,7 +54,11 @@ public class WebState implements StatefulObject {
   private String title = "No Title";
   private DateTime insertionTime = null;
   private Set<String> currentListsSet = new HashSet<String>();
-
+  private Set<String> users = new HashSet<String>();
+  private Set<String> usersDeleted = new HashSet<String>();
+  private Set<String> groups = new HashSet<String>();
+  private Set<String> groupsDeleted = new HashSet<String>();
+  private Set<String> menberPermissions = new HashSet<String>();
 
   // By default mark all web state as exisitng when they are created.
   private boolean exists = true;
@@ -173,8 +177,49 @@ public class WebState implements StatefulObject {
       webId = newKey;
     }
   }
+  
 
-  /**
+  public Set<String> getUsers() {
+	return users;
+  }
+
+  public void setUsers(Set<String> users) {
+	this.users = users;
+  }
+
+  public Set<String> getUsersDeleted() {
+	return usersDeleted;
+  }
+
+  public void setUsersDeleted(Set<String> usersDeleted) {
+	this.usersDeleted = usersDeleted;
+  }
+
+  public Set<String> getGroups() {
+	return groups;
+  }
+
+  public void setGroups(Set<String> groups) {
+	this.groups = groups;
+  }
+
+  public Set<String> getGroupsDeleted() {
+	return groupsDeleted;
+  }
+
+  public void setGroupsDeleted(Set<String> groupsDeleted) {
+	this.groupsDeleted = groupsDeleted;
+  }
+   
+  public Set<String> getMenberPermissions() {
+	return menberPermissions;
+  }
+
+  public void setMenberPermissions(Set<String> menberPermissions) {
+	this.menberPermissions = menberPermissions;
+  }
+
+/**
    * Checks of the Web is existing or deleted
    */
   public boolean isExisting() {
@@ -645,6 +690,77 @@ public class WebState implements StatefulObject {
 
     handler.startElement("", "", SPConstants.WEB_STATE, atts);
 
+    
+    atts.clear();
+    handler.startElement("", "", SPConstants.LIST_GROUPS, atts);
+    if(groups!=null){
+  	  for (String group : groups) {
+  		  if(group!=null){
+  			  handler.startElement("", "", SPConstants.GROUP, atts);
+  			  handler.characters(group.toCharArray(),0,group.length());
+  			  handler.endElement("", "",  SPConstants.GROUP);
+  			  }
+  		  }
+  	  }
+
+    handler.endElement("", "", SPConstants.LIST_GROUPS);
+
+
+    handler.startElement("", "", SPConstants.LIST_GROUPS_DELETED, atts);
+    if(groupsDeleted!=null){
+  	  for (String group : groupsDeleted) {
+  		  if(group!=null){
+  			  handler.startElement("", "", SPConstants.GROUP, atts);
+  			  handler.characters(group.toCharArray(),0,group.length());
+  			  handler.endElement("", "",  SPConstants.GROUP);
+  			  }
+  		  }
+  	  }
+ 
+    handler.endElement("", "", SPConstants.LIST_GROUPS_DELETED);
+
+    handler.startElement("", "", SPConstants.LIST_USERS, atts);
+    if(users!=null){
+  	  for (String user : users) {
+  		  if(user!=null){
+  			  handler.startElement("", "", SPConstants.USER, atts);
+  			  handler.characters(user.toCharArray(),0,user.length());
+  			  handler.endElement("", "",  SPConstants.USER);
+  			  }
+  		  }
+  	  }
+
+    handler.endElement("", "", SPConstants.LIST_USERS);
+
+
+    handler.startElement("", "", SPConstants.LIST_USERS_DELETED, atts);
+    if(usersDeleted!=null){
+  	  for (String user : usersDeleted) {
+  		  if(user!=null){
+  			  handler.startElement("", "", SPConstants.USER, atts);
+  			  handler.characters(user.toCharArray(),0,user.length());
+  			  handler.endElement("", "",  SPConstants.USER);
+  			  }
+  		  }
+  	  }
+ 
+    handler.endElement("", "", SPConstants.LIST_USERS_DELETED);
+    
+    
+    handler.startElement("", "", SPConstants.LIST_MENBER_PERMISSIONS, atts);
+    if(menberPermissions!=null){
+  	  for (String menberPermission : menberPermissions) {
+  		  if(menberPermission!=null){
+  			  handler.startElement("", "", SPConstants.MENBER_PERMISSION, atts);
+  			  handler.characters(menberPermission.toCharArray(),0,menberPermission.length());
+  			  handler.endElement("", "",  SPConstants.MENBER_PERMISSION);
+  			  }
+  		  }
+  	  }
+ 
+    handler.endElement("", "", SPConstants.LIST_MENBER_PERMISSIONS);
+    
+    
     // dump the actual ListStates:
     // Dump the "NoCrawl" flag for liststates irrespective of whether the
     // site is set to index no content. The main reason is to cater

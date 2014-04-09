@@ -103,6 +103,15 @@ public class SharepointClientContext implements Cloneable {
 	private LdapConnectionSettings ldapConnectionSettings;
 	private boolean feedUnPublishedDocuments;
 	private boolean initialTraversal;
+	private boolean enabledGoogleServices = true;
+		
+	public boolean isEnabledGoogleServices() {
+		return enabledGoogleServices;
+	}
+
+	public void setEnabledGoogleServices(boolean enabledGoogleServices) {
+		this.enabledGoogleServices = enabledGoogleServices;
+	}
 
 	public boolean isFeedUnPublishedDocuments() {
 		return feedUnPublishedDocuments;

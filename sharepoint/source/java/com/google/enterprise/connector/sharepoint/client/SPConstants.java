@@ -127,6 +127,7 @@ public class SPConstants {
 
   // End Point constants
   public static final String LISTS_END_POINT = "/_vti_bin/Lists.asmx";
+  public static final String PERMISSIONS_END_POINT = "/_vti_bin/Permissions.asmx";
   public static final String WEBSENDPOINT = "/_vti_bin/Webs.asmx";
   public static final String ALERTSENDPOINT = "/_vti_bin/alerts.asmx";
   public static final String GSPBULKAUTHORIZATION_ENDPOINT = "/_vti_bin/GSBulkAuthorization.asmx";
@@ -134,7 +135,7 @@ public class SPConstants {
   public static final String SITEDATAENDPOINT = "/_vti_bin/SiteData.asmx";
   public static final String USERPROFILEENDPOINT = "/_vti_bin/UserProfileService.asmx";
   public static final String GSACLENDPOINT = "/_vti_bin/GssAcl.asmx";
-
+  
   public static final String DEFAULT_ROWLIMIT = "1000";
 
   // Constant used by ListsWS for precessing the list item data returned by
@@ -318,7 +319,14 @@ public class SPConstants {
   public static final String LIST_COLUMNS = "ListColumns";
   public static final String LIST_COLUMNS_DELETED = "ListColumnsDeleted";
   public static final String COLUMN = "Column";
-
+  public static final String LIST_USERS = "ListsUsers";
+  public static final String LIST_USERS_DELETED = "ListUsersDeleted";
+  public static final String USER = "user";
+  public static final String LIST_GROUPS = "ListGroups";
+  public static final String LIST_GROUPS_DELETED = "ListGroupsDeleted";
+  public static final String GROUP = "group";
+  public static final String LIST_MENBER_PERMISSIONS = "ListMenberPermissions";
+  public static final String MENBER_PERMISSION = "MenberPermission";
   
   // To persist the list of renamed folders that need to be processed on
   // connector restart

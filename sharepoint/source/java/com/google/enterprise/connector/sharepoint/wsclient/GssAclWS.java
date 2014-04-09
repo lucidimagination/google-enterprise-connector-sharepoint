@@ -19,6 +19,12 @@ import com.google.enterprise.connector.sharepoint.client.SPConstants;
 import com.google.enterprise.connector.sharepoint.client.SharepointClientContext;
 import com.google.enterprise.connector.sharepoint.client.Util;
 import com.google.enterprise.connector.sharepoint.dao.UserGroupMembership;
+import com.google.enterprise.connector.sharepoint.generated.Permissions.PermissionsSoap_BindingStub;
+import com.google.enterprise.connector.sharepoint.generated.Permissions.Permissions;
+import com.google.enterprise.connector.sharepoint.generated.Permissions.PermissionsLocator;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteDataSoap_BindingStub;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteData;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteDataLocator;
 import com.google.enterprise.connector.sharepoint.generated.gssacl.GssAce;
 import com.google.enterprise.connector.sharepoint.generated.gssacl.GssAcl;
 import com.google.enterprise.connector.sharepoint.generated.gssacl.GssAclChange;
@@ -41,21 +47,30 @@ import com.google.enterprise.connector.sharepoint.spiimpl.SharepointException;
 import com.google.enterprise.connector.sharepoint.state.ListState;
 import com.google.enterprise.connector.sharepoint.state.WebState;
 import com.google.enterprise.connector.spi.SpiConstants.RoleType;
-
 import org.apache.axis.AxisFault;
-
+import org.apache.axis.message.MessageElement;
+import javax.xml.rpc.holders.StringHolder;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Document;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.xml.rpc.ServiceException;
-
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.rpc.ServiceException;
 /**
  * Java Client for calling GssAcl.asmx web service. Provides a layer to talk to
  * the ACL Web Service on the SharePoint server. Any call to this Web Service
@@ -68,6 +83,10 @@ public class GssAclWS {
   private GssAclMonitorSoap_BindingStub stub = null;
   private final Logger LOGGER = Logger.getLogger(GssAclWS.class.getName());
   private SharepointClientContext sharepointClientContext = null;
+  private String endpoint_permissions;
+  private String endpoint_siteData;
+  private PermissionsSoap_BindingStub stub_permissions = null;
+  private SiteDataSoap_BindingStub stub_siteData = null;
 
   /**
    * @param inSharepointClientContext The Context is passed so that necessary
@@ -79,7 +98,8 @@ public class GssAclWS {
    * @throws SharepointException
    */
   public GssAclWS(final SharepointClientContext inSharepointClientContext,
-      String siteurl) throws SharepointException {
+      String siteurl) throws SharepointException {	 
+		
     if (null == inSharepointClientContext) {
       throw new SharepointException("SharePointClient context cannot be null ");
     }
@@ -93,16 +113,46 @@ public class GssAclWS {
 
     endpoint = Util.encodeURL(siteurl) + SPConstants.GSACLENDPOINT;
     LOGGER.log(Level.CONFIG, "Endpoint set to: " + endpoint);
+    
+    endpoint_siteData = Util.encodeURL(siteurl) + SPConstants.SITEDATAENDPOINT;
+    LOGGER.log(Level.CONFIG, "Endpoint for siteData set to: " + endpoint_siteData);
 
+    endpoint_permissions = Util.encodeURL(siteurl) + SPConstants.PERMISSIONS_END_POINT;
+    LOGGER.log(Level.CONFIG, "Endpoint for permissions set to: " + endpoint_permissions);
+    
     final GssAclMonitorLocator loc = new GssAclMonitorLocator();
     loc.setGssAclMonitorSoapEndpointAddress(endpoint);
     final GssAclMonitor service = loc;
+
+    final SiteDataLocator loc_siteData = new SiteDataLocator();
+    loc_siteData.setSiteDataSoapEndpointAddress(endpoint_siteData);
+    final SiteData gspSiteData = loc_siteData;
+
+    final PermissionsLocator loc_permissions = new PermissionsLocator();
+    loc_permissions.setPermissionsSoapEndpointAddress(endpoint_permissions);
+    final Permissions gspPermissions = loc_permissions; 
 
     try {
       stub = (GssAclMonitorSoap_BindingStub) service.getGssAclMonitorSoap();
     } catch (final ServiceException e) {
       LOGGER.log(Level.WARNING, e.getMessage(), e);
+      sharepointClientContext.setEnabledGoogleServices(false);
       throw new SharepointException("Unable to create GssAcl stub");
+    }
+    
+    if(!sharepointClientContext.isEnabledGoogleServices()){
+        try {
+           stub_siteData = (SiteDataSoap_BindingStub)gspSiteData.getSiteDataSoap();
+        } catch (final ServiceException e) {
+               LOGGER.log(Level.WARNING, e.getMessage(), e);
+               throw new SharepointException("Unable to get the stub_siteData stub");
+        }
+        try {
+           stub_permissions = (PermissionsSoap_BindingStub)gspPermissions.getPermissionsSoap();
+        } catch (final ServiceException e) {
+               LOGGER.log(Level.WARNING, e.getMessage(), e);
+               throw new SharepointException("Unable to get the stub_Permissions stub");
+        }      
     }
 
     final String strDomain = sharepointClientContext.getDomain();
@@ -116,8 +166,106 @@ public class GssAclWS {
     stub.setTimeout(sharepointClientContext.getWebServiceTimeOut());
     LOGGER.fine("Set time-out of : "
         + sharepointClientContext.getWebServiceTimeOut() + " milliseconds");
+    
+    if(!sharepointClientContext.isEnabledGoogleServices()){
+        stub_permissions.setUsername(strUser);
+        stub_permissions.setPassword(strPassword);
+        // The web service time-out value
+        stub_permissions.setTimeout(sharepointClientContext.getWebServiceTimeOut());
+        LOGGER.fine("Set time-out of : "
+            + sharepointClientContext.getWebServiceTimeOut() + " milliseconds");
+        
+        stub_siteData.setUsername(strUser);
+        stub_siteData.setPassword(strPassword);
+        // The web service time-out value
+        stub_siteData.setTimeout(sharepointClientContext.getWebServiceTimeOut());
+        LOGGER.fine("Set time-out of : "
+            + sharepointClientContext.getWebServiceTimeOut() + " milliseconds");
+    
+    }
+    
   }
 
+	public boolean CompareLists(Set<String> listWS,Set<String> listState,Set<String> listDeleted,Set<Integer> deleted) {
+		listDeleted.clear();
+			for(String item:listState){
+				if(!listWS.contains(item))
+					listDeleted.add(item);
+					deleted.add(Integer.parseInt(item.split(";")[1]));
+				}
+		if (listState.size() == 0)
+			return true;
+		return (listWS.containsAll(listState) && listState.size()==listWS.size());
+	}
+	
+	public boolean CompareListsGroups(Set<String> listWS,Set<String> listState,Set<String> listDeleted,Set<Integer> deleted,Set<Integer> noChanged) {
+		listDeleted.clear();
+			for(String item:listState){
+				if(!listWS.contains(item)){
+					listDeleted.add(item);
+					deleted.add(Integer.parseInt(item.split(";")[1]));
+				}else{
+					noChanged.add(Integer.parseInt(item.split(";")[1]));
+				}
+		}
+		if (listState.size() == 0)
+			return true;
+		return (listWS.containsAll(listState) && listState.size()==listWS.size());
+	}
+	
+	public boolean ComparePermissions(Set<String> permissionsWS,Set<String> permissionsState) {
+		if(permissionsState.size()==0)
+			return true;
+		return (permissionsWS.containsAll(permissionsState) && permissionsState.size()==permissionsWS.size());
+	}
+		
+	public Map<Integer, Set<UserGroupMembership>> getChangesInSiteCollection(String xmlString,StringBuilder changeId,StringBuilder siteCollectionUrl,Set<String> groupList,Set<String> userList,Set<String> permissions)
+			throws SAXException, IOException, ParserConfigurationException {
+		Document XMLDoc = DocumentBuilderFactory.newInstance()
+				.newDocumentBuilder()
+				.parse(new InputSource(new StringReader(xmlString)));
+		Element element = XMLDoc.getDocumentElement();
+		NodeList nodes= element.getChildNodes();
+		Element metadata = ((Element) nodes.item(0));
+		Element web = ((Element) nodes.item(2));
+	    changeId.append(metadata.getAttribute("ChangeId"));
+		siteCollectionUrl.append(metadata.getAttribute("URL"));
+		NodeList groups = (nodes.item(1).getChildNodes());
+		Map<Integer, Set<UserGroupMembership>> groupsToMemberships = new HashMap<Integer, Set<UserGroupMembership>>();
+		for(int i=0;i < groups.getLength();i++){
+			Element group = ((Element)groups.item(i));
+			NodeList groupAndUsers = (group.getChildNodes());
+			Element mainGroup = ((Element)groupAndUsers.item(0));
+			int groupId = Integer.parseInt(mainGroup.getAttribute("ID"));
+			String groupName = mainGroup.getAttribute("Name");
+			String groupString = groupName+";"+groupId+";";
+			NodeList users = (((Element)groupAndUsers.item(1)).getChildNodes());
+            Set<UserGroupMembership> memberships = new TreeSet<UserGroupMembership>();
+			int usersLength = users.getLength();
+            for(int j=0;j < usersLength;j++){
+				Element user = ((Element)users.item(j));
+				int userId = Integer.parseInt(user.getAttribute("ID"));
+				String userName = user.getAttribute("Name");
+				userList.add(userName+";"+userId);
+				 memberships.add(new UserGroupMembership(userId,
+						 userName, groupId, groupName,
+						 siteCollectionUrl.toString()));
+				 groupString+=userId+(((j+1)<usersLength)?",":"");
+			}
+            groupsToMemberships.put(groupId, memberships);
+			groupList.add(groupString);
+		}
+	    NodeList webElements = (web.getChildNodes());
+		NodeList aclPermissions = webElements.item(2).getFirstChild().getChildNodes();
+		for(int i=0;i < aclPermissions.getLength();i++){
+			String memberId =  ((Element)aclPermissions.item(i)).getAttribute("memberid");
+			String mask = ((Element)aclPermissions.item(i)).getAttribute("mask");
+			permissions.add(memberId+";"+mask);
+		}
+		
+		return groupsToMemberships;
+	}
+  
   /**
    * Executes GetAclForUrls() web method of GssAcl web service. Used to get the
    * ACL of a set of entities.
@@ -359,7 +507,11 @@ public class GssAclWS {
    *          crawled
    */
   public void fetchAclForDocuments(SPDocumentList resultSet, WebState webState) {
-    if (!sharepointClientContext.isPushAcls() || null == resultSet) {
+
+	if (!sharepointClientContext.isPushAcls() || null == resultSet) {
+      return;
+    }
+    if(!sharepointClientContext.isEnabledGoogleServices()){
       return;
     }
     List<SPDocument> documents = resultSet.getDocuments();
@@ -396,6 +548,9 @@ public class GssAclWS {
    */
   public List<SPDocument> getListItemsForAclChangeAndUpdateState(
       ListState listState, ListsWS listsWS) {
+	if(!sharepointClientContext.isEnabledGoogleServices()){
+	    return null;
+	  }
     List<SPDocument> aclChangedDocs = null;
     if (sharepointClientContext.isPushAcls() && listState.isAclChanged()) {
       GssGetListItemsWithInheritingRoleAssignments wsResult = GetListItemsWithInheritingRoleAssignments(listState.getPrimaryKey(), String.valueOf(listState.getLastDocIdCrawledForAcl()));
@@ -487,7 +642,8 @@ public class GssAclWS {
   }
 
   public void fetchAclChangesSinceTokenAndUpdateState(WebState webState) {
-    if (!sharepointClientContext.isPushAcls()) {
+    
+	if (!sharepointClientContext.isPushAcls()) {
       return;
     }
 
@@ -509,10 +665,103 @@ public class GssAclWS {
     LOGGER.log(Level.CONFIG, "Initiating ACL Change detection for web [ "
         + webState.getWebUrl() + " ] from change token [ "
         + webState.getAclChangeTokenForWsCall());
+    
+    if(!sharepointClientContext.isEnabledGoogleServices()){
+    	String result = getChangesWithoutGoogleServices();
+    	processWithoutGoogleServices(result,webState);
+      return;
+    }
+    
     GssGetAclChangesSinceTokenResult wsResult = getAclChangesSinceToken(webState);
     processWsResponse(wsResult, webState);
   }
+  
+  public void processWithoutGoogleServices(String result,WebState webState){
+	  
+	if (null == result || null == webState) {
+	      return;
+	}
+    
+	StringBuilder changeId = new StringBuilder();
+	StringBuilder siteCollectionUrl = new StringBuilder();
+    Set<String> groupList = new HashSet<String>();
+	Set<String> userList = new HashSet<String>();
+	Set<String> permissionsList = new HashSet<String>();
 
+    Set<Integer> noChangedGroups = new TreeSet<Integer>();
+    Set<Integer> deletedGroups = new TreeSet<Integer>();
+    Set<Integer> deletedUsers = new TreeSet<Integer>();
+	Map<Integer, Set<UserGroupMembership>> memberships = null;
+	try{
+		memberships = getChangesInSiteCollection(result,changeId,siteCollectionUrl,groupList,userList,permissionsList);
+	}catch (Exception ex){
+	    LOGGER.log(Level.CONFIG, "Fail to retrieve data from the xml ");
+	}
+	
+	boolean isUserChanged = CompareLists(userList,webState.getUsers(),webState.getUsersDeleted(),deletedUsers);
+	boolean isGroupChanged = CompareListsGroups(groupList,webState.getGroups(),webState.getGroupsDeleted(),deletedGroups,noChangedGroups);
+	boolean isPermissionChanged = ComparePermissions(permissionsList, webState.getMenberPermissions());
+
+	if(!isUserChanged || !isGroupChanged || !isPermissionChanged){
+        LOGGER.log(Level.INFO, "Resetting all list states under web [ "
+                + webState.getWebUrl()
+                + " ] because are there changes with users or groups has been deleted from the SharePoint.");
+            webState.resetState();
+	}
+	webState.setUsers(userList);
+	webState.setGroupsDeleted(groupList);	
+	webState.setMenberPermissions(permissionsList);
+	
+    if (null != memberships && memberships.size() > 0) {
+    	for(Integer noChange:noChangedGroups)
+    		memberships.remove(noChange);
+    }	
+    // Sync the membership of all changed groups
+    syncGroupMembershipWithoutGoogleServices(deletedUsers, deletedGroups, siteCollectionUrl.toString(), memberships);
+
+    if (null == webState.getNextAclChangeToken()
+        || webState.getNextAclChangeToken().trim().length() == 0) {
+	webState.setNextAclChangeToken(changeId.toString());
+    }
+  }
+
+  public String getChangesWithoutGoogleServices() {
+		StringHolder lastChangeID = new StringHolder();
+	    try {
+			LOGGER.config("Fetching SharePoint indexing options for site : "
+					+ sharepointClientContext.getSiteURL());
+			String result = stub_siteData
+					.getContent(
+							com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+									.fromString("SiteCollection"), "", "", "", true,
+							true, lastChangeID);
+			return 	result;
+	    } catch (final AxisFault af) {
+	      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
+	          && (sharepointClientContext.getDomain() != null)) {
+	        final String username = Util.switchUserNameFormat(stub_siteData.getUsername());
+	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
+	            + stub_siteData.getUsername() + " ]. Trying with " + username);
+	        stub_siteData.setUsername(username);
+	        try {
+					String result = stub_siteData
+							.getContent(
+									com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+											.fromString("SiteCollection"), "", "", "",
+									true, true, lastChangeID);
+					return  result;
+	          } catch (final Exception e) {
+	            LOGGER.log(Level.WARNING, "Call to siteData getChangesFromContent failed with the following exception: ", e);
+	          }
+	      } else {
+	        LOGGER.log(Level.WARNING, "Call to siteData getChangesFromContent failed with the following exception: ", af);
+	      }
+	    } catch (final Throwable e) {
+	      LOGGER.log(Level.WARNING, "Call to siteData getChangesFromContent failed with the following exception: ", e);
+	    }
+	    return null;
+	  }
+  
   /**
    * Analyze the set of changes returned by the Custom ACL web service and
    * update the status of child ListStates reflecting the way crawl should
@@ -529,6 +778,7 @@ public class GssAclWS {
     if (null == wsResult || null == webstate) {
       return;
     }
+
     LOGGER.log(Level.CONFIG, "Processing the received ACL changes. WsLog [ "
         + wsResult.getLogMessage() + " ]");
     GssAclChangeCollection allChanges = wsResult.getAllChanges();
@@ -578,6 +828,7 @@ public class GssAclWS {
       if (objType == ObjectType.SECURITY_POLICY) {
         LOGGER.log(Level.INFO, "Resetting all list states under web [ "
             + webstate.getWebUrl() + " ] because of security policy change.");
+       
         webstate.resetState();
         isWebReset = true;
       } else if (objType == ObjectType.WEB && !isWebChanged) {
@@ -753,6 +1004,46 @@ public class GssAclWS {
       }
     }
   }
+  
+  private void syncGroupMembershipWithoutGoogleServices(Set<Integer> deletedUsers,
+	      Set<Integer> deletedGroups, String siteCollectionUrl,Map<Integer, Set<UserGroupMembership>> groupToMemberships) {
+	    if (null == sharepointClientContext.getUserDataStoreDAO()) {
+	      return;
+	    }
+
+	    if (null != deletedUsers && deletedUsers.size() > 0) {
+	      try {
+	        sharepointClientContext.getUserDataStoreDAO().removeUserMembershipsFromNamespace(deletedUsers, siteCollectionUrl);
+	      } catch (Exception e) {
+	        LOGGER.log(Level.WARNING, "Failed to remove user memberships from namespace [ "
+	            + siteCollectionUrl + " ] ");
+	      }
+	    }
+
+	    if (null != deletedGroups && deletedGroups.size() > 0) {
+	      try {
+	        sharepointClientContext.getUserDataStoreDAO().removeGroupMembershipsFromNamespace(deletedGroups, siteCollectionUrl);
+	      } catch (Exception e) {
+	        LOGGER.log(Level.WARNING, "Failed to remove group memberships from namespace [ "
+	            + siteCollectionUrl + " ] ");
+	      }
+	    }
+
+	      try {
+	        if (null != groupToMemberships && groupToMemberships.size() > 0) {
+	          try {
+	            sharepointClientContext.getUserDataStoreDAO().syncGroupMemberships(groupToMemberships, siteCollectionUrl);
+	          } catch (Exception e) {
+	            LOGGER.log(Level.WARNING, "Failure while syncing memberships from namespace [ "
+	                + siteCollectionUrl + " ]");
+	          }
+	        }
+	      } catch (Exception e) {
+	        LOGGER.log(Level.WARNING, "Failed to update/sync group memberships from namespace [ "
+	            + siteCollectionUrl + " ] ");
+	      }
+	    
+	  }
 
   /**
    * Resolves a set of groups identified by their IDs and returns a map
@@ -843,6 +1134,8 @@ public class GssAclWS {
    */
   private String[] getListsWithInheritingRoleAssignments() {
     String[] result = null;
+	if (!sharepointClientContext.isEnabledGoogleServices())
+		return result;
     try {
       result = stub.getListsWithInheritingRoleAssignments();
     } catch (final AxisFault af) {
@@ -909,6 +1202,8 @@ public class GssAclWS {
    * checking the Web Service connectivity
    */
   public void checkConnectivity() throws SharepointException {
+	if (!sharepointClientContext.isEnabledGoogleServices())
+		return;
     try {
       stub.checkConnectivity();
     } catch (final AxisFault af) {

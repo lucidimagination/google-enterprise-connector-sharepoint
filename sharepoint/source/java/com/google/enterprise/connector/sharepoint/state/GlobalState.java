@@ -90,7 +90,8 @@ public class GlobalState {
   // This enum is a list of all such nodes whose values are stored as
   // inner test in the node.
   enum Nodes {
-    FOLDERS_EXTRAID, ATTACHMENTS_EXTRAID, ALERTS_EXTRAID, COLUMNS_EXTRAID, COLUMNS_DELETED_EXTRAID;
+    FOLDERS_EXTRAID, ATTACHMENTS_EXTRAID, ALERTS_EXTRAID, COLUMNS_EXTRAID, COLUMNS_DELETED_EXTRAID,
+    USERS_EXTRAID, USERS_DELETED_EXTRAID, GROUPS_EXTRAID, GROUPS_DELETED_EXTRAID, MENBERS_PERMISSION_EXTRAID;
   }
 
   /**
@@ -223,6 +224,16 @@ public class GlobalState {
         currentNode = Nodes.COLUMNS_EXTRAID;
       } else if (SPConstants.LIST_COLUMNS_DELETED.equals(localName)) {
         currentNode = Nodes.COLUMNS_DELETED_EXTRAID;
+      } else if (SPConstants.LIST_USERS.equals(localName)) {
+        currentNode = Nodes.USERS_EXTRAID;
+      } else if (SPConstants.LIST_USERS_DELETED.equals(localName)) {
+        currentNode = Nodes.USERS_DELETED_EXTRAID;
+      } else if (SPConstants.LIST_GROUPS.equals(localName)) {
+        currentNode = Nodes.GROUPS_EXTRAID;
+      } else if (SPConstants.LIST_GROUPS_DELETED.equals(localName)) {
+        currentNode = Nodes.GROUPS_DELETED_EXTRAID;
+      }  else if (SPConstants.LIST_MENBER_PERMISSIONS.equals(localName)) {
+        currentNode = Nodes.MENBERS_PERMISSION_EXTRAID;
       } 
       else if (SPConstants.WEB_STATE.equals(localName)) {
         try {
@@ -264,6 +275,25 @@ public class GlobalState {
     	  else if(Nodes.COLUMNS_DELETED_EXTRAID.equals(currentNode))
     		  list.getListColumnsDeleted().add(chrs);
           characters.setLength(0);
+      }else if (SPConstants.USER.equals(localName)) {
+    	  final String chrs = characters.toString().trim();
+    	  if(Nodes.USERS_EXTRAID.equals(currentNode))
+    		  web.getUsers().add(chrs);
+    	  else if(Nodes.USERS_DELETED_EXTRAID.equals(currentNode))
+    		  web.getUsersDeleted().add(chrs);
+          characters.setLength(0);
+      }else if (SPConstants.GROUP.equals(localName)) {
+    	  final String chrs = characters.toString().trim();
+    	  if(Nodes.GROUPS_EXTRAID.equals(currentNode))
+    		  web.getGroups().add(chrs);
+    	  else if(Nodes.GROUPS_DELETED_EXTRAID.equals(currentNode))
+    		  web.getGroupsDeleted().add(chrs);
+          characters.setLength(0);
+      }else if (SPConstants.MENBER_PERMISSION.equals(localName)) {
+    	  final String chrs = characters.toString().trim();
+    	  if(Nodes.MENBERS_PERMISSION_EXTRAID.equals(currentNode))
+    		  web.getMenberPermissions().add(chrs);
+          characters.setLength(0);
       }
       
     }
@@ -285,6 +315,16 @@ public class GlobalState {
     	characters.append(new String(ch,start,end));
       } else if (Nodes.COLUMNS_DELETED_EXTRAID.equals(currentNode)){
       	characters.append(new String(ch,start,end));
+      } else if (Nodes.USERS_EXTRAID.equals(currentNode)){
+    	characters.append(new String(ch,start,end));
+      } else if (Nodes.USERS_DELETED_EXTRAID.equals(currentNode)){
+      	characters.append(new String(ch,start,end));
+      } else if (Nodes.GROUPS_EXTRAID.equals(currentNode)){
+    	characters.append(new String(ch,start,end));
+      } else if (Nodes.GROUPS_DELETED_EXTRAID.equals(currentNode)){
+      	characters.append(new String(ch,start,end));
+      } else if (Nodes.MENBERS_PERMISSION_EXTRAID.equals(currentNode)){
+        characters.append(new String(ch,start,end));
       }
       
     }

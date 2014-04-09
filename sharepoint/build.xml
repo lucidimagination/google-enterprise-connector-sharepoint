@@ -155,6 +155,9 @@
     <wsdl2java url="${wsdl}/GssAcl.wsdl"
                package="${generated.package}.gssacl"
                generates="${src_generated}/gssacl/GssAcl.java"/>
+    <wsdl2java url="${wsdl}/Permissions.wsdl"
+               package="${generated.package}.Permissions"
+               generates="${src_generated}/Permissions/Permissions.java"/> 
   </target>
 
   <target name="compile_stubs" depends="init, stubs">

@@ -26,8 +26,22 @@ import com.google.enterprise.connector.sharepoint.spiimpl.SharepointException;
 import com.google.enterprise.connector.sharepoint.state.ListState;
 import com.google.enterprise.connector.sharepoint.state.WebState;
 
-import org.apache.axis.AxisFault;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteData;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteDataLocator;
+import com.google.enterprise.connector.sharepoint.generated.sitedata.SiteDataSoap_BindingStub;
 
+import com.google.enterprise.connector.sharepoint.generated.webs.Webs;
+import com.google.enterprise.connector.sharepoint.generated.webs.WebsLocator;
+import com.google.enterprise.connector.sharepoint.generated.webs.WebsSoap_BindingStub;
+
+
+import org.apache.axis.AxisFault;
+import org.apache.axis.message.MessageElement;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
+import java.io.IOException;
+import java.io.StringReader;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -43,6 +57,8 @@ import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.rpc.ServiceException;
 
 /**
@@ -57,7 +73,11 @@ public class GSSiteDiscoveryWS {
   private SharepointClientContext sharepointClientContext;
   private String endpoint;
   private SiteDiscoverySoap_BindingStub stub = null;
-
+  private String endpoint_webs;
+  private String endpoint_siteData;
+  private WebsSoap_BindingStub stub_webs = null;
+  private SiteDataSoap_BindingStub stub_siteData = null;
+  
   /**
    * @param inSharepointClientContext The Context is passed so that necessary
    *          information can be used to create the instance of current class
@@ -65,6 +85,30 @@ public class GSSiteDiscoveryWS {
    *          in SharePointClientContext.
    * @throws SharepointException
    */
+  
+	public static boolean getNoIndexFromContent(String xmlString)
+			throws SAXException, IOException, ParserConfigurationException {
+		org.w3c.dom.Document XMLDoc = DocumentBuilderFactory.newInstance()
+				.newDocumentBuilder()
+				.parse(new InputSource(new StringReader(xmlString)));
+		org.w3c.dom.Element element = XMLDoc.getDocumentElement();
+		return Boolean.parseBoolean(((org.w3c.dom.Element) element
+				.getFirstChild()).getAttribute("NoIndex"));
+	}
+	
+	public Object[] getUrlsFromMessage(MessageElement[] elements) {
+		List<Object> objects = new ArrayList<Object>();
+		for (MessageElement child : elements) {
+			for (final java.util.Iterator itrchild = child.getChildElements(); itrchild
+					.hasNext();) {
+				MessageElement oneAttr = (MessageElement) itrchild.next();//
+				if (oneAttr != null)
+					objects.add(oneAttr.getAttribute("Url"));
+			}
+		}
+		return objects.toArray();
+	}
+	  
   public GSSiteDiscoveryWS(
       final SharepointClientContext inSharepointClientContext, String siteUrl)
       throws SharepointException {
@@ -77,14 +121,48 @@ public class GSSiteDiscoveryWS {
           + SPConstants.GSPSITEDISCOVERYWS_END_POINT;
       LOGGER.log(Level.CONFIG, "Endpoint set to: " + endpoint);
 
+      endpoint_webs = Util.encodeURL(siteUrl)
+              + SPConstants.WEBSENDPOINT;
+      LOGGER.log(Level.CONFIG, "Endpoint for webs set to: " + endpoint);
+
+      endpoint_siteData = Util.encodeURL(siteUrl)
+              + SPConstants.SITEDATAENDPOINT;
+      LOGGER.log(Level.CONFIG, "Endpoint for siteData set to: " + endpoint);
+
       final SiteDiscoveryLocator loc = new SiteDiscoveryLocator();
       loc.setSiteDiscoverySoapEndpointAddress(endpoint);
       final SiteDiscovery gspSiteDiscovery = loc;
+      
+      final WebsLocator loc_webs = new WebsLocator();
+      loc_webs.setWebsSoapEndpointAddress(endpoint_webs);
+      final Webs gspWebs = loc_webs;
+      
+      final SiteDataLocator loc_siteData = new SiteDataLocator();
+      loc_siteData.setSiteDataSoapEndpointAddress(endpoint_siteData);
+      final SiteData gspSiteData = loc_siteData;
+
       try {
         stub = (SiteDiscoverySoap_BindingStub) gspSiteDiscovery.getSiteDiscoverySoap();
       } catch (final ServiceException e) {
         LOGGER.log(Level.WARNING, e.getMessage(), e);
+        sharepointClientContext.setEnabledGoogleServices(false);
         throw new SharepointException("Unable to get the GSSiteDiscovery stub");
+      }
+      
+      if(!sharepointClientContext.isEnabledGoogleServices()){
+       try {
+          stub_siteData = (SiteDataSoap_BindingStub)gspSiteData.getSiteDataSoap();
+       } catch (final ServiceException e) {
+              LOGGER.log(Level.WARNING, e.getMessage(), e);
+              throw new SharepointException("Unable to get the stub_siteData stub");
+       }
+          
+       try {
+          stub_webs = (WebsSoap_BindingStub) gspWebs.getWebsSoap();
+       }catch (final ServiceException e) {
+              LOGGER.log(Level.WARNING, e.getMessage(), e);
+              throw new SharepointException("Unable to get the stub_webs stub");
+       }
       }
 
       final String strDomain = inSharepointClientContext.getDomain();
@@ -96,6 +174,19 @@ public class GSSiteDiscoveryWS {
       stub.setPassword(strPassword);
       // The web service time-out value
       stub.setTimeout(sharepointClientContext.getWebServiceTimeOut());
+      
+	  if (!sharepointClientContext.isEnabledGoogleServices()) {
+		stub_webs.setUsername(strUser);
+		stub_webs.setPassword(strPassword);
+		// The web service time-out value
+		stub_webs.setTimeout(sharepointClientContext
+				.getWebServiceTimeOut());
+		stub_siteData.setUsername(strUser);
+		stub_siteData.setPassword(strPassword);
+		// The web service time-out value
+		stub_siteData.setTimeout(sharepointClientContext
+				.getWebServiceTimeOut());
+	  }
       LOGGER.fine("Set time-out of : "
           + sharepointClientContext.getWebServiceTimeOut() + " milliseconds");
     }
@@ -107,72 +198,110 @@ public class GSSiteDiscoveryWS {
    *
    * @return the set of all site colelltions returned bu the GSSiteDiscovery
    */
-  public Set<String> getMatchingSiteCollections() {
-    final Set<String> siteCollections = new TreeSet<String>();
-    Object[] res = null;
-    try {
-      res = stub.getAllSiteCollectionFromAllWebApps();
-    } catch (final AxisFault af) { // Handling of username formats for
-      // different authentication models.
-      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
-          && (sharepointClientContext.getDomain() != null)) {
-        final String username = Util.switchUserNameFormat(stub.getUsername());
-        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
-            + stub.getUsername() + " ]. Trying with " + username);
-        stub.setUsername(username);
-        try {
-          res = stub.getAllSiteCollectionFromAllWebApps();
-        } catch (final Exception e) {
-          LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", e);
-          return siteCollections;
-        }
-      } else {
-        LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", af);
-        return siteCollections;
-      }
-    } catch (final Throwable e) {
-      LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", e);
-      return siteCollections;
-    }
+  
 
-    if (null != res) {
-      for (Object element : res) {
-        String url = (String) element;
-        URL u = null;
-        try {
-          u = new URL(url);
-        } catch (final MalformedURLException e1) {
-          LOGGER.log(Level.WARNING, "Malformed site collection URL found [ "
-              + url + " ]", e1);
-          continue;
-        }
+  public Object[] getSiteCollectionsWithGoogleServices(){
+      try {
+  	      return stub.getAllSiteCollectionFromAllWebApps();
+  	    } catch (final AxisFault af) { // Handling of username formats for
+  	      // different authentication models.
+  	      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
+  	          && (sharepointClientContext.getDomain() != null)) {
+  	        final String username = Util.switchUserNameFormat(stub.getUsername());
+  	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
+  	            + stub.getUsername() + " ]. Trying with " + username);
+  	        stub.setUsername(username);
+  	        try {
+  	        	return  stub.getAllSiteCollectionFromAllWebApps();
+  	        } catch (final Exception e) {
+  	          LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", e);
+  	          return null;
+  	        }
+  	      } else {
+  	        LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", af);
+  	        return null;
+  	      }
+  	    } catch (final Throwable e) {
+  	      LOGGER.log(Level.WARNING, "Call to the GSSiteDiscovery web service failed with the following exception: ", e);
+  	      return null;
+  	    }	
 
-        int iPort = u.getPort();
-        if (iPort == -1) {
-          iPort = u.getDefaultPort();
-        }
-
-        url = u.getProtocol() + SPConstants.URL_SEP + getFQDNHost(u.getHost())
-            + SPConstants.COLON + iPort;
-
-        final String path = u.getPath();
-        if ((path == null) || path.equalsIgnoreCase("")) {
-          url += SPConstants.SLASH;
-        } else {
-          url += path;
-        }
-
-        if (sharepointClientContext.isIncludedUrl(url)) {
-          siteCollections.add(url);
-        } else {
-          LOGGER.warning("excluding " + url);
-        }
-      }
-    }
-    LOGGER.log(Level.CONFIG, "GSSiteDiscovery discovered following Site Collection URLs:"
-        + siteCollections);
-    return siteCollections;
   }
+
+  public Object[] getSiteCollectionsWithoutGoogleServices() {
+      try {
+  	      return getUrlsFromMessage(stub_webs.getAllSubWebCollection().get_any());
+  	    } catch (final AxisFault af) { // Handling of username formats for
+  	      // different authentication models.
+  	      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
+  	          && (sharepointClientContext.getDomain() != null)) {
+  	        final String username = Util.switchUserNameFormat(stub_webs.getUsername());
+  	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
+  	            + stub_webs.getUsername() + " ]. Trying with " + username);
+  	        stub_webs.setUsername(username);
+  	        try {
+  	        	return getUrlsFromMessage(stub_webs.getAllSubWebCollection().get_any());
+  	        } catch (final Exception e) {
+  	          LOGGER.log(Level.WARNING, "Call to the webs web service failed with the following exception: ", e);
+  	          return null;
+  	        }
+  	      } else {
+  	        LOGGER.log(Level.WARNING, "Call to the webs web service failed with the following exception: ", af);
+  	        return null;
+  	      }
+  	    } catch (final Throwable e) {
+  	      LOGGER.log(Level.WARNING, "Call to the webs web service failed with the following exception: ", e);
+  	      return null;
+  	    }	
+
+  }
+    
+    public Set<String> getMatchingSiteCollections() {
+  	    final Set<String> siteCollections = new TreeSet<String>();
+  	    Object[] res = null;
+		if (sharepointClientContext.isEnabledGoogleServices())
+			res = getSiteCollectionsWithGoogleServices();
+		else
+			res = getSiteCollectionsWithoutGoogleServices();
+  	    if (null != res) {
+  	      for (Object element : res) {
+  	        String url = (String) element;
+  	        URL u = null;
+  	        try {
+  	          u = new URL(url);
+  	        } catch (final MalformedURLException e1) {
+  	          LOGGER.log(Level.WARNING, "Malformed site collection URL found [ "
+  	              + url + " ]", e1);
+  	          continue;
+  	        }
+
+  	        int iPort = u.getPort();
+  	        if (iPort == -1) {
+  	          iPort = u.getDefaultPort();
+  	        }
+
+  	        url = u.getProtocol() + SPConstants.URL_SEP + getFQDNHost(u.getHost())
+  	            + SPConstants.COLON + iPort;
+
+  	        final String path = u.getPath();
+  	        if ((path == null) || path.equalsIgnoreCase("")) {
+  	          url += SPConstants.SLASH;
+  	        } else {
+  	          url += path;
+  	        }
+
+  	        if (sharepointClientContext.isIncludedUrl(url)) {
+  	          siteCollections.add(url);
+  	        } else {
+  	          LOGGER.warning("excluding " + url);
+  	        }
+  	      }
+  	    }
+  	    LOGGER.log(Level.CONFIG, "GSSiteDiscovery discovered following Site Collection URLs:"
+  	        + siteCollections);
+  	    return siteCollections;
+  	  }
+
 
   /**
    * @param hostName
@@ -201,7 +330,15 @@ public class GSSiteDiscoveryWS {
    * @return WebCrawlInfo of the web whose URL was used to construct the
    *         endpoint
    */
+  
   public WebCrawlInfo getCurrentWebCrawlInfo() {
+		if (sharepointClientContext.isEnabledGoogleServices())
+			return getCurrentWebCrawlInfoWithGoogleServices();
+		else
+			return getCurrentWebCrawlInfoWithoutGoogleServices();
+  }
+  
+  public WebCrawlInfo getCurrentWebCrawlInfoWithGoogleServices() {
     try {
       LOGGER.config("Fetching SharePoint indexing options for site : "
           + sharepointClientContext.getSiteURL());
@@ -226,6 +363,49 @@ public class GSSiteDiscoveryWS {
     }
     return null;
   }
+  
+  
+  public WebCrawlInfo getCurrentWebCrawlInfoWithoutGoogleServices() {
+		javax.xml.rpc.holders.StringHolder lastChangeID = new javax.xml.rpc.holders.StringHolder();
+	    try {
+			LOGGER.config("Fetching SharePoint indexing options for site : "
+					+ sharepointClientContext.getSiteURL());
+			String result = stub_siteData
+					.getContent(
+							com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+									.fromString("Site"), "", "", "", true,
+							true, lastChangeID);
+			boolean nocrawl = getNoIndexFromContent(result);
+			return new WebCrawlInfo(sharepointClientContext.getSiteURL(), true,
+					getNoIndexFromContent(result), true, "");
+	    } catch (final AxisFault af) {
+	      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
+	          && (sharepointClientContext.getDomain() != null)) {
+	        final String username = Util.switchUserNameFormat(stub_siteData.getUsername());
+	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
+	            + stub_siteData.getUsername() + " ]. Trying with " + username);
+	        stub_siteData.setUsername(username);
+	        try {
+					String result = stub_siteData
+							.getContent(
+									com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+											.fromString("Site"), "", "", "",
+									true, true, lastChangeID);
+					boolean nocrawl = getNoIndexFromContent(result);
+					return new WebCrawlInfo(
+							sharepointClientContext.getSiteURL(), true,
+							nocrawl, true, "");
+	          } catch (final Exception e) {
+	            LOGGER.log(Level.WARNING, "Call to siteData.getCurrentWebCrawlInfoWithoutGoogleServices() failed with the following exception: ", e);
+	          }
+	      } else {
+	        LOGGER.log(Level.WARNING, "Call to siteData.getCurrentWebCrawlInfoWithoutGoogleServices() failed with the following exception: ", af);
+	      }
+	    } catch (final Throwable e) {
+	      LOGGER.log(Level.WARNING, "Call to siteData.getCurrentWebCrawlInfoWithoutGoogleServices() failed with the following exception: ", e);
+	    }
+	    return null;
+	  }
 
   /**
    * Retrieves the information about crawl behavior of a list of webs
@@ -233,7 +413,7 @@ public class GSSiteDiscoveryWS {
    *
    * @param weburls All web URLs whose crawl info is to be found
    */
-  public WebCrawlInfo[] getWebCrawlInfoInBatch(String[] weburls) {
+  public WebCrawlInfo[] getWebCrawlInfoInBatchWithGoogleServices(String[] weburls) {
     WebCrawlInfo[] wsResult = null;
     if (null == weburls || weburls.length == 0) {
       return wsResult;
@@ -262,7 +442,89 @@ public class GSSiteDiscoveryWS {
     }
     return wsResult;
   }
-
+  
+  
+  public WebCrawlInfo[] getWebCrawlInfoInBatchWithoutGoogleServices(String[] weburls) {
+	    List<WebCrawlInfo> wsResult = new ArrayList<WebCrawlInfo>();
+	    if (null == weburls || weburls.length == 0) {
+	        return null;
+	      }
+	    String endpoint_siteData_tmp = null;
+	    SiteDataSoap_BindingStub stub_siteData_tmp = null;
+	    String strDomain = sharepointClientContext.getDomain();
+	    String strUser = sharepointClientContext.getUsername();
+	    String strPassword = sharepointClientContext.getPassword();
+	    strUser = Util.getUserNameWithDomain(strUser, strDomain); 
+	    try{
+		for(String url:weburls){
+			endpoint_siteData_tmp = Util.encodeURL(url)
+					+ SPConstants.SITEDATAENDPOINT;
+			final SiteDataLocator loc_siteData_tmp = new SiteDataLocator();
+			loc_siteData_tmp.setSiteDataSoapEndpointAddress(endpoint_siteData_tmp);
+			final SiteData gspSiteData_tmp = loc_siteData_tmp;
+			try {
+				stub_siteData_tmp = (SiteDataSoap_BindingStub) gspSiteData_tmp
+						.getSiteDataSoap();
+			} catch (final ServiceException e) {
+				LOGGER.log(Level.WARNING, e.getMessage(), e);
+			}
+			stub_siteData_tmp.setUsername(strUser);
+			stub_siteData_tmp.setPassword(strPassword);
+			stub_siteData_tmp.setTimeout(sharepointClientContext
+					.getWebServiceTimeOut());
+			javax.xml.rpc.holders.StringHolder lastChangeID = new javax.xml.rpc.holders.StringHolder();
+			String resultS = stub_siteData_tmp
+					.getContent(
+							com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+									.fromString("Site"), "", "", "", true,
+							true, lastChangeID);
+			boolean nocrawl = getNoIndexFromContent(resultS);
+			wsResult.add(new WebCrawlInfo(url,true,nocrawl,true,""));
+		}     
+	      return (WebCrawlInfo[])wsResult.toArray(new WebCrawlInfo[wsResult.size()]);
+	    } catch (final AxisFault af) {
+	      if ((SPConstants.UNAUTHORIZED.indexOf(af.getFaultString()) != -1)
+	          && (sharepointClientContext.getDomain() != null)) {
+	        strUser = Util.switchUserNameFormat(stub_siteData_tmp.getUsername());
+	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
+	            + stub_siteData_tmp.getUsername() + " ]. Trying with " + strUser);
+	        try {
+				for(String url:weburls){
+					endpoint_siteData_tmp = Util.encodeURL(url)
+							+ SPConstants.SITEDATAENDPOINT;
+					final SiteDataLocator loc_siteData_tmp = new SiteDataLocator();
+					loc_siteData_tmp.setSiteDataSoapEndpointAddress(endpoint_siteData_tmp);
+					final SiteData gspSiteData_tmp = loc_siteData_tmp;
+					try {
+						stub_siteData_tmp = (SiteDataSoap_BindingStub) gspSiteData_tmp
+								.getSiteDataSoap();
+					} catch (final ServiceException e) {
+						LOGGER.log(Level.WARNING, e.getMessage(), e);
+					}
+					stub_siteData_tmp.setUsername(strUser);
+					stub_siteData_tmp.setPassword(strPassword);
+					stub_siteData_tmp.setTimeout(sharepointClientContext
+							.getWebServiceTimeOut());
+					javax.xml.rpc.holders.StringHolder lastChangeID = new javax.xml.rpc.holders.StringHolder();
+					String resultS = stub_siteData_tmp
+							.getContent(
+									com.google.enterprise.connector.sharepoint.generated.sitedata.ObjectType
+											.fromString("Site"), "", "", "", true,
+									true, lastChangeID);
+					boolean nocrawl = getNoIndexFromContent(resultS);
+					wsResult.add(new WebCrawlInfo(url,true,nocrawl,true,""));
+				}
+	          } catch (final Exception e) {
+	            LOGGER.log(Level.WARNING, "Call to siteData.getWebCrawlInfoInBatch() failed with the following exception: ", e);
+	          }	        
+	      } else {
+	        LOGGER.log(Level.WARNING, "Call to siteData.getWebCrawlInfoInBatch() failed with the following exception: ", af);
+	      }
+	    } catch (final Throwable e) {
+	      LOGGER.log(Level.WARNING, "Call to siteData.getWebCrawlInfoInBatch() failed with the following exception: ", e);
+	    }
+	    return (WebCrawlInfo[])wsResult.toArray(new WebCrawlInfo[wsResult.size()]);
+	  }
   /**
    * Retrieves and update the information about crawl behavior of a set of webs
    *
@@ -293,7 +555,11 @@ public class GSSiteDiscoveryWS {
         weburls[i++] = web.getWebUrl();
         webUrlMap.put(web.getWebUrl(), web);
       }
-      WebCrawlInfo[] webCrawlInfos = sitews.getWebCrawlInfoInBatch(weburls);
+      WebCrawlInfo[] webCrawlInfos;
+      if (sharepointClientContext.isEnabledGoogleServices())
+    	  webCrawlInfos = sitews.getWebCrawlInfoInBatchWithGoogleServices(weburls);
+      else
+    	  webCrawlInfos = sitews.getWebCrawlInfoInBatchWithoutGoogleServices(weburls);
       if (null == webCrawlInfos) {
         return;
       }
@@ -316,7 +582,7 @@ public class GSSiteDiscoveryWS {
    * @param listCollection ListStates to be be updated
    */
   public void updateListCrawlInfo(Collection<ListState> listCollection) {
-    if (null == listCollection) {
+    if (null == listCollection || !sharepointClientContext.isEnabledGoogleServices()) {
       return;
     }
     Map<String, ListState> listCrawlInfoMap = new HashMap<String, ListState>();
