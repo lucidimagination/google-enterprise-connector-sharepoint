@@ -40,9 +40,12 @@ import com.google.enterprise.connector.spiimpl.StringValue;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.io.IOUtils;
+
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -54,8 +57,10 @@ import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -77,6 +82,9 @@ public class SPDocument implements Document, Comparable<SPDocument> {
   private FeedType feedType;
   private SPType spType;
   private ActionType action = ActionType.ADD;
+  private HttpMethodBase method = null;
+  private HttpClient httpClient = null;
+
 
   private Folder parentFolder;
   // When a folder is renamed/restored and the current document is being sent
@@ -684,11 +692,13 @@ public class SPDocument implements Document, Comparable<SPDocument> {
     }
     if (downloadContent) {
       final String docURL = Util.encodeURL(contentDwnldURL);
-      HttpMethodBase method = null;
       try {
         method = new GetMethod(docURL);
-        responseCode = sharepointClientContext.checkConnectivity(docURL, method);
+		Entry<HttpMethodBase, HttpClient> methodAndClient = new SimpleEntry(method, null);
+        responseCode = sharepointClientContext.checkConnectivity(docURL, methodAndClient);
+		httpClient = methodAndClient.getValue();
         if (null == method) {
+          ((SimpleHttpConnectionManager)httpClient.getHttpConnectionManager()).shutdown();
           return SPConstants.CONNECTIVITY_FAIL;
         }
         content = method.getResponseBodyAsStream();
@@ -737,6 +747,7 @@ public class SPDocument implements Document, Comparable<SPDocument> {
           throw new SkippedDocumentException(msg);
         }
       }
+      //release(method);
     }
 
     if (responseCode == 200) {
@@ -746,6 +757,12 @@ public class SPDocument implements Document, Comparable<SPDocument> {
     }
   }
 
+	public void release() {
+		method.releaseConnection();
+		((SimpleHttpConnectionManager) httpClient.getHttpConnectionManager())
+				.shutdown();
+	}
+  
   /**
    * @return the content_type
    */

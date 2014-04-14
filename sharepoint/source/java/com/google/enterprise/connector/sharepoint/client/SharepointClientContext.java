@@ -33,6 +33,8 @@ import org.apache.commons.httpclient.methods.HeadMethod;
 import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,6 +44,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -645,7 +649,7 @@ public class SharepointClientContext implements Cloneable {
 	 * @param strURL The URL to be checked
 	 * @return the HTTP response code
 	 */
-	public int checkConnectivity(final String strURL, HttpMethodBase method)
+	public int checkConnectivity(final String strURL, Entry<HttpMethodBase,HttpClient> methodAndClient)
 			throws Exception {
 		LOGGER.log(Level.CONFIG, "Connecting [ " + strURL + " ] ....");
 		int responseCode = 0;
@@ -654,7 +658,10 @@ public class SharepointClientContext implements Cloneable {
 		Credentials credentials = null;
 		boolean kerberos = false;
 		boolean ntlm = true; // We first try to use ntlm
-
+		boolean noMethod = false;
+		HttpMethodBase method = null;
+		if (methodAndClient != null)
+			method = methodAndClient.getKey();
 		if (kdcServer != null
 				&& !kdcServer.equalsIgnoreCase(SPConstants.BLANK_STRING)) {
 			credentials = new NTCredentials(username, password, host, domain);
@@ -665,8 +672,11 @@ public class SharepointClientContext implements Cloneable {
 			credentials = new UsernamePasswordCredentials(username, password);
 			ntlm = false;
 		}
-		final HttpClient httpClient = new HttpClient();
+		HttpClient httpClient = new HttpClient();
+		if (methodAndClient != null)
+			methodAndClient.setValue(httpClient);
 		HttpClientParams params = httpClient.getParams();
+		//params.getconnectionmanagerclass
 		// Fix for the Issue[5408782] SharePoint connector fails to traverse a site,
 		// circular redirect exception is observed.
 		params.setBooleanParameter(HttpClientParams.ALLOW_CIRCULAR_REDIRECTS, true);
@@ -676,16 +686,25 @@ public class SharepointClientContext implements Cloneable {
 		// to follow.
 		params.setIntParameter(HttpClientParams.MAX_REDIRECTS, 10);
 		httpClient.getState().setCredentials(AuthScope.ANY, credentials);
-		if (null == method) {
-			method = new HeadMethod(strURL);
-		}
-		responseCode = httpClient.executeMethod(method);
-		if (responseCode == 401 && ntlm && !kerberos) {
-			LOGGER.log(Level.FINE, "Trying with HTTP Basic.");
-			username = Util.getUserNameWithDomain(this.username, domain);
-			credentials = new UsernamePasswordCredentials(username, password);
-			httpClient.getState().setCredentials(AuthScope.ANY, credentials);
+		try{
+			if (null == method) {
+				method = new HeadMethod(strURL);
+				noMethod = true;
+			}
 			responseCode = httpClient.executeMethod(method);
+			if (responseCode == 401 && ntlm && !kerberos) {
+				LOGGER.log(Level.FINE, "Trying with HTTP Basic.");
+				username = Util.getUserNameWithDomain(this.username, domain);
+				credentials = new UsernamePasswordCredentials(username,
+						password);
+				httpClient.getState()
+						.setCredentials(AuthScope.ANY, credentials);
+				responseCode = httpClient.executeMethod(method);
+			}
+		} finally {
+			if (noMethod) {
+				releaseAndShutdown(method, httpClient);
+			}
 		}
 		if (responseCode != 200) {
 			LOGGER.log(Level.WARNING, "responseCode: " + responseCode);
@@ -702,20 +721,28 @@ public class SharepointClientContext implements Cloneable {
 	public SPConstants.SPType checkSharePointType(String strURL) {
 		LOGGER.log(Level.CONFIG, "Checking [ " + strURL
 				+ " ] for the SharePoint version.");
-
 		strURL = Util.encodeURL(strURL);
 		HttpMethodBase method = null;
+		HttpClient httpClient = null;
 		try {
 			method = new HeadMethod(strURL);
-			checkConnectivity(strURL, method);
+			Entry<HttpMethodBase, HttpClient> methodAndClient = new SimpleEntry(
+					method, null);
+			checkConnectivity(strURL, methodAndClient);
+			httpClient = methodAndClient.getValue();
 			if (null == method) {
+				((SimpleHttpConnectionManager) httpClient
+						.getHttpConnectionManager()).shutdown();
 				return null;
 			}
 		} catch (final Exception e) {
 			LOGGER.log(Level.WARNING, "Unable to connect " + strURL, e);
+			releaseAndShutdown(method, httpClient);
 			return null;
 		}
 		if (null == method) {
+			((SimpleHttpConnectionManager) httpClient
+					.getHttpConnectionManager()).shutdown();
 			return null;
 		}
 		final Header contentType = method.getResponseHeader("MicrosoftSharePointTeamServices");
@@ -723,6 +750,7 @@ public class SharepointClientContext implements Cloneable {
 		if (contentType != null) {
 			version = contentType.getValue();
 		}
+		releaseAndShutdown(method, httpClient);
 		LOGGER.info("SharePoint Version: " + version);
 		if (version == null) {
 			LOGGER.warning("Sharepoint version not found for the site [ " + strURL
@@ -755,6 +783,13 @@ public class SharepointClientContext implements Cloneable {
 		}
 	}
 
+	public void releaseAndShutdown(HttpMethodBase method, HttpClient httpClient) {
+		if (method != null)
+			method.releaseConnection();
+		if (method != null)
+			((SimpleHttpConnectionManager) httpClient
+					.getHttpConnectionManager()).shutdown();
+	}
 	/**
 	 * Check if the String Value can be included or not
 	 * 
