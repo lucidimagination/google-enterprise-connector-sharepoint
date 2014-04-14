@@ -33,7 +33,6 @@ import org.apache.commons.httpclient.methods.HeadMethod;
 import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.httpclient.protocol.Protocol;
 import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 
 import java.io.File;
@@ -786,7 +785,7 @@ public class SharepointClientContext implements Cloneable {
 	public void releaseAndShutdown(HttpMethodBase method, HttpClient httpClient) {
 		if (method != null)
 			method.releaseConnection();
-		if (method != null)
+		if (httpClient != null)
 			((SimpleHttpConnectionManager) httpClient
 					.getHttpConnectionManager()).shutdown();
 	}

@@ -747,7 +747,6 @@ public class SPDocument implements Document, Comparable<SPDocument> {
           throw new SkippedDocumentException(msg);
         }
       }
-      //release(method);
     }
 
     if (responseCode == 200) {
