@@ -27,6 +27,13 @@ import com.google.enterprise.connector.sharepoint.state.ListState;
 import com.google.enterprise.connector.sharepoint.state.WebState;
 import com.google.enterprise.connector.spi.RepositoryException;
 
+import com.google.enterprise.connector.sharepoint.client.SharepointClient;
+import com.google.enterprise.connector.sharepoint.client.SharepointClientContext;
+import com.google.enterprise.connector.sharepoint.spiimpl.SharepointTraversalManager;
+import com.google.enterprise.connector.sharepoint.wsclient.handlers.FileTransport;
+import com.google.enterprise.connector.sharepoint.wsclient.WsUtil;
+import org.apache.axis.client.Call;
+
 import java.net.MalformedURLException;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -45,6 +52,7 @@ public class ListsWSTest extends TestCase {
   protected void setUp() throws Exception {
     System.out.println("\n...Setting Up...");
     System.out.println("Initializing SharepointClientContext ...");
+
     this.sharepointClientContext = TestConfiguration.initContext();
 
     assertNotNull(this.sharepointClientContext);
@@ -80,7 +88,10 @@ public class ListsWSTest extends TestCase {
         this.postsList = baseList;
       }
     }
-    System.out.println("Test List being used: " + this.testList.getPrimaryKey());
+   System.out.println("Test List being used: " + this.testList.getPrimaryKey());
+   // A call to Call.initialize is required to reset the Axis HTTP transport 
+   // back to the orginal set by Axis.
+   Call.initialize();
   }
 
   public final void testListsWS() throws Throwable {
@@ -207,6 +218,31 @@ public class ListsWSTest extends TestCase {
       final List items = this.listWS.getListItemChangesSinceToken(this.testList, null);
       assertNotNull(items);
     }
+  }
+ 
+  // Verifies SAX parsing for SOAP responses with duplicate attributes.
+  public final void testDuplicateAttributes() throws Throwable {
+    Call.setTransportForProtocol("http", FileTransport.class);
+    FileTransport.setResponseFileName("source/javatests/data/duplicate-attributes.xml");
+
+    WsUtil.UnregisterSaxClientFactory();
+    List items = getSite1TestListChangesSinceToken();
+    assertNotNull(items);
+    assertEquals(0, items.size());
+
+    // The SAX client factory is registered by the SharepointClient constructor 
+    // so we need to create a new instance of SharepointClient.
+    SharepointClient sharepointClient = new SharepointClient(sharepointClientContext);
+    items = getSite1TestListChangesSinceToken();
+    assertNotNull(items);
+    assertTrue(items.size() > 0);
+  }
+  
+  private List getSite1TestListChangesSinceToken() throws SharepointException {
+    sharepointClientContext.setSiteURL(TestConfiguration.Site1_URL);
+    listWS = new ListsWS(sharepointClientContext);
+    assertNotNull(listWS);
+    return listWS.getListItemChangesSinceToken(testList, null);
   }
 
   public void testGetListItemsForPublishedContent()
