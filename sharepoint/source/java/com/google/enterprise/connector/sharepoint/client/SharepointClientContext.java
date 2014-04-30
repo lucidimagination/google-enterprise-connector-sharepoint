@@ -109,8 +109,14 @@ public class SharepointClientContext implements Cloneable {
 		return enabledGoogleServices;
 	}
 
-	public void setEnabledGoogleServices(boolean enabledGoogleServices) {
-		this.enabledGoogleServices = enabledGoogleServices;
+	public void setEnabledGoogleServices(String page) {
+        int responseCode = 0;
+        try {
+          responseCode = checkConnectivity(page, null);
+        } catch (final Exception e) {
+          LOGGER.log(Level.WARNING, "Connectivity failed! ", e);
+        }
+        this.enabledGoogleServices = (responseCode == 200);
 	}
 
 	public boolean isFeedUnPublishedDocuments() {

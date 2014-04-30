@@ -60,6 +60,7 @@ public class GSBulkAuthorizationWS {
       sharepointClientContext = inSharepointClientContext;
       endpoint = Util.encodeURL(sharepointClientContext.getSiteURL())
           + SPConstants.GSPBULKAUTHORIZATION_ENDPOINT;
+      sharepointClientContext.setEnabledGoogleServices(endpoint);
       LOGGER.log(Level.CONFIG, "Endpoint set to: " + endpoint);
 
       final BulkAuthorizationLocator bulkloc = new BulkAuthorizationLocator();
@@ -70,7 +71,6 @@ public class GSBulkAuthorizationWS {
         stub = (BulkAuthorizationSoap_BindingStub) service.getBulkAuthorizationSoap();
       } catch (final ServiceException e) {
         LOGGER.log(Level.WARNING, "Unable to get bulk authZ soap stub ", e);
-        sharepointClientContext.setEnabledGoogleServices(false);
         throw new SharepointException("Unable to get bulk authZ soap stub");
       }
 
@@ -133,7 +133,6 @@ public class GSBulkAuthorizationWS {
     try {
       status = stub.checkConnectivity();
       LOGGER.info("GS Connectivity status: " + status);
-      sharepointClientContext.setEnabledGoogleServices(true);
       return status;
     } catch (final AxisFault af) { // Handling of username formats for
       // different authentication models.
@@ -148,17 +147,14 @@ public class GSBulkAuthorizationWS {
           return status;
         } catch (final Exception e) {
           LOGGER.log(Level.WARNING, "Can not connect to GSBulkAuthorization web service.", e);
-          sharepointClientContext.setEnabledGoogleServices(false);
           return e.getLocalizedMessage();
         }
       } else {
         LOGGER.log(Level.WARNING, "Can not connect to GSBulkAuthorization web service.", af);
-        sharepointClientContext.setEnabledGoogleServices(false);
         return af.getLocalizedMessage();
       }
     } catch (final Throwable e) {
       LOGGER.log(Level.WARNING, "Can not connect to GSBulkAuthorization web service.", e);
-      sharepointClientContext.setEnabledGoogleServices(false);
       return e.getLocalizedMessage();
     }
   }

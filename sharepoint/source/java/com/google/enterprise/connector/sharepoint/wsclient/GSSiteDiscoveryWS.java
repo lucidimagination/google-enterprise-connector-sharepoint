@@ -48,6 +48,7 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +122,7 @@ public class GSSiteDiscoveryWS {
           + SPConstants.GSPSITEDISCOVERYWS_END_POINT;
       LOGGER.log(Level.CONFIG, "Endpoint set to: " + endpoint);
 
+      sharepointClientContext.setEnabledGoogleServices(endpoint);
       endpoint_webs = Util.encodeURL(siteUrl)
               + SPConstants.WEBSENDPOINT;
       LOGGER.log(Level.CONFIG, "Endpoint for webs set to: " + endpoint);
@@ -145,7 +147,6 @@ public class GSSiteDiscoveryWS {
         stub = (SiteDiscoverySoap_BindingStub) gspSiteDiscovery.getSiteDiscoverySoap();
       } catch (final ServiceException e) {
         LOGGER.log(Level.WARNING, e.getMessage(), e);
-        sharepointClientContext.setEnabledGoogleServices(false);
         throw new SharepointException("Unable to get the GSSiteDiscovery stub");
       }
       
@@ -443,12 +444,20 @@ public class GSSiteDiscoveryWS {
     return wsResult;
   }
   
+  private static final Comparator<String> STARTSWITH_ORDER = new Comparator<String>() {
+	  public int compare(String str1, String str2) {
+		  if (str1.startsWith(str2))
+			  return 0;
+		  return str1.compareTo(str2);
+		  }
+  };
   
-  public WebCrawlInfo[] getWebCrawlInfoInBatchWithoutGoogleServices(String[] weburls) {
+  public WebCrawlInfo[] getWebCrawlInfoInBatchWithoutGoogleServices(Set<String> weburlsSet) {
 	    List<WebCrawlInfo> wsResult = new ArrayList<WebCrawlInfo>();
-	    if (null == weburls || weburls.length == 0) {
+	    Set<String> falseSet = new TreeSet<String>(STARTSWITH_ORDER);
+	    if (null == weburlsSet || weburlsSet.size() == 0) {
 	        return null;
-	      }
+	    }
 	    String endpoint_siteData_tmp = null;
 	    SiteDataSoap_BindingStub stub_siteData_tmp = null;
 	    String strDomain = sharepointClientContext.getDomain();
@@ -456,7 +465,11 @@ public class GSSiteDiscoveryWS {
 	    String strPassword = sharepointClientContext.getPassword();
 	    strUser = Util.getUserNameWithDomain(strUser, strDomain); 
 	    try{
-		for(String url:weburls){
+		   for(String url:weburlsSet){
+	 		if(falseSet.contains(url)){
+	   			wsResult.add(new WebCrawlInfo(url,true,true,true,""));
+	   			continue;
+	 		}
 			endpoint_siteData_tmp = Util.encodeURL(url)
 					+ SPConstants.SITEDATAENDPOINT;
 			final SiteDataLocator loc_siteData_tmp = new SiteDataLocator();
@@ -479,6 +492,8 @@ public class GSSiteDiscoveryWS {
 									.fromString("Site"), "", "", "", true,
 							true, lastChangeID);
 			boolean nocrawl = getNoIndexFromContent(resultS);
+			if(nocrawl)
+				falseSet.add(url);
 			wsResult.add(new WebCrawlInfo(url,true,nocrawl,true,""));
 		}     
 	      return (WebCrawlInfo[])wsResult.toArray(new WebCrawlInfo[wsResult.size()]);
@@ -489,7 +504,11 @@ public class GSSiteDiscoveryWS {
 	        LOGGER.log(Level.CONFIG, "Web Service call failed for username [ "
 	            + stub_siteData_tmp.getUsername() + " ]. Trying with " + strUser);
 	        try {
-				for(String url:weburls){
+		           for(String url:weburlsSet){
+		 			if(falseSet.contains(url)){
+		   				wsResult.add(new WebCrawlInfo(url,true,true,true,""));
+		   				continue;
+		 			}
 					endpoint_siteData_tmp = Util.encodeURL(url)
 							+ SPConstants.SITEDATAENDPOINT;
 					final SiteDataLocator loc_siteData_tmp = new SiteDataLocator();
@@ -512,6 +531,8 @@ public class GSSiteDiscoveryWS {
 											.fromString("Site"), "", "", "", true,
 									true, lastChangeID);
 					boolean nocrawl = getNoIndexFromContent(resultS);
+					if(nocrawl)
+						falseSet.add(url);
 					wsResult.add(new WebCrawlInfo(url,true,nocrawl,true,""));
 				}
 	          } catch (final Exception e) {
@@ -550,16 +571,20 @@ public class GSSiteDiscoveryWS {
       }
       Map<String, WebState> webUrlMap = new HashMap<String, WebState>();
       String[] weburls = new String[webs.size()];
+      Set<String> weburlsSet = new TreeSet<String>();
       int i = 0;
+      String url = null;
       for (WebState web : entry.getValue()) {
-        weburls[i++] = web.getWebUrl();
-        webUrlMap.put(web.getWebUrl(), web);
+    	url = web.getWebUrl();
+        weburls[i++] = url;
+        webUrlMap.put(url, web);
+        weburlsSet.add(url);
       }
       WebCrawlInfo[] webCrawlInfos;
       if (sharepointClientContext.isEnabledGoogleServices())
     	  webCrawlInfos = sitews.getWebCrawlInfoInBatchWithGoogleServices(weburls);
       else
-    	  webCrawlInfos = sitews.getWebCrawlInfoInBatchWithoutGoogleServices(weburls);
+    	  webCrawlInfos = sitews.getWebCrawlInfoInBatchWithoutGoogleServices(weburlsSet);
       if (null == webCrawlInfos) {
         return;
       }

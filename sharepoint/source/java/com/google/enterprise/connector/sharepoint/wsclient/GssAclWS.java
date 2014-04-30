@@ -114,6 +114,7 @@ public class GssAclWS {
     endpoint = Util.encodeURL(siteurl) + SPConstants.GSACLENDPOINT;
     LOGGER.log(Level.CONFIG, "Endpoint set to: " + endpoint);
     
+    sharepointClientContext.setEnabledGoogleServices(endpoint);
     endpoint_siteData = Util.encodeURL(siteurl) + SPConstants.SITEDATAENDPOINT;
     LOGGER.log(Level.CONFIG, "Endpoint for siteData set to: " + endpoint_siteData);
 
@@ -136,7 +137,6 @@ public class GssAclWS {
       stub = (GssAclMonitorSoap_BindingStub) service.getGssAclMonitorSoap();
     } catch (final ServiceException e) {
       LOGGER.log(Level.WARNING, e.getMessage(), e);
-      sharepointClientContext.setEnabledGoogleServices(false);
       throw new SharepointException("Unable to create GssAcl stub");
     }
     
