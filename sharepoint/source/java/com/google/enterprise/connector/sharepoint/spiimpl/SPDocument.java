@@ -45,6 +45,9 @@ import org.apache.commons.httpclient.HttpMethodBase;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.io.IOUtils;
 
+import java.io.FilterInputStream;
+import java.io.IOException;
+
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 
 import java.io.ByteArrayOutputStream;
@@ -82,8 +85,6 @@ public class SPDocument implements Document, Comparable<SPDocument> {
   private FeedType feedType;
   private SPType spType;
   private ActionType action = ActionType.ADD;
-  private HttpMethodBase method = null;
-  private HttpClient httpClient = null;
 
 
   private Folder parentFolder;
@@ -106,7 +107,7 @@ public class SPDocument implements Document, Comparable<SPDocument> {
   // call.
   // No assumptions should be made based on these attributes very early during
   // traversal.
-  private InputStream content = null;
+  private FilterInputStream content = null;
   private String content_type = null;
   private int fileSize = -1;
 
@@ -692,16 +693,24 @@ public class SPDocument implements Document, Comparable<SPDocument> {
     }
     if (downloadContent) {
       final String docURL = Util.encodeURL(contentDwnldURL);
+      final HttpMethodBase method;
       try {
         method = new GetMethod(docURL);
-		Entry<HttpMethodBase, HttpClient> methodAndClient = new SimpleEntry(method, null);
-        responseCode = sharepointClientContext.checkConnectivity(docURL, methodAndClient);
-		httpClient = methodAndClient.getValue();
+        responseCode = sharepointClientContext.checkConnectivity(docURL, method);
         if (null == method) {
-          ((SimpleHttpConnectionManager)httpClient.getHttpConnectionManager()).shutdown();
           return SPConstants.CONNECTIVITY_FAIL;
         }
-        content = method.getResponseBodyAsStream();
+        content = new FilterInputStream(method.getResponseBodyAsStream()) {
+          @Override
+	          public void close() throws IOException {
+	            try {
+	              super.close();
+	            } finally {
+	              method.releaseConnection();
+	            }
+	          }
+	        };
+      
       } catch (Throwable t) {
         String msg = new StringBuffer("Unable to fetch contents from URL: ").append(url).toString();
         LOGGER.log(Level.WARNING, "Unable to fetch contents from URL: " + url, t);
@@ -755,12 +764,6 @@ public class SPDocument implements Document, Comparable<SPDocument> {
       return "" + responseCode;
     }
   }
-
-	public void release() {
-		method.releaseConnection();
-		((SimpleHttpConnectionManager) httpClient.getHttpConnectionManager())
-				.shutdown();
-	}
   
   /**
    * @return the content_type

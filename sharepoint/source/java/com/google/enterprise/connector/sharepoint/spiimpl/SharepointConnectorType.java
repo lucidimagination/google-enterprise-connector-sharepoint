@@ -33,7 +33,7 @@ import com.google.enterprise.connector.spi.ConfigureResponse;
 import com.google.enterprise.connector.spi.ConnectorFactory;
 import com.google.enterprise.connector.spi.ConnectorType;
 import com.google.enterprise.connector.spi.XmlUtils;
-
+import com.google.enterprise.connector.sharepoint.wsclient.soap.SPClientFactory;
 import org.apache.commons.httpclient.auth.AuthPolicy;
 import org.apache.commons.httpclient.contrib.auth.NegotiateScheme;
 
@@ -115,6 +115,25 @@ public class SharepointConnectorType implements ConnectorType {
 	private String cacheRefreshInterval;
 	private LdapConnectionSettings ldapConnectionSettings;
 	private boolean editMode;
+	private SPClientFactory clientFactory = new SPClientFactory();
+
+	/**
+	 * Returns the client factory for the web services.
+	 *
+	 * @return a client factory object
+	 */
+	public SPClientFactory getClientFactory() {
+	  return clientFactory;
+	}
+
+	/**
+	 * Sets the client factory for the web services.
+	 *
+	 * @param clientFactory the client factory to use for the web services
+	 */
+	public void setClientFactory(final SPClientFactory clientFactory) {
+	  this.clientFactory = clientFactory;
+	}
 
 	/**
 	 * Sets the keys that are required for configuration. These are the actual
@@ -130,7 +149,7 @@ public class SharepointConnectorType implements ConnectorType {
 			keys = inKeys;
 		}
 	}
-
+	
 	/**
 	 * Sets the display strings for the configuration form depending on the
 	 * language settings.
@@ -1074,7 +1093,7 @@ public class SharepointConnectorType implements ConnectorType {
 		}
 
 		try {
-			sharepointClientContext = new SharepointClientContext(sharepointUrl,
+			sharepointClientContext = new SharepointClientContext(clientFactory, sharepointUrl,
 					domain, kdcServer, username, password, "", includeURL, excludeURL,
 					mySiteUrl, "", feedType,
 					new Boolean(useSPSearchVisibility).booleanValue());

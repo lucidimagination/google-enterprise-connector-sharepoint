@@ -35,6 +35,8 @@ import com.google.enterprise.connector.spi.ConnectorShutdownAware;
 import com.google.enterprise.connector.spi.LocalDatabase;
 import com.google.enterprise.connector.spi.RepositoryException;
 import com.google.enterprise.connector.spi.Session;
+import com.google.enterprise.connector.sharepoint.wsclient.soap.SPClientFactory;
+
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,7 +56,7 @@ public class SharepointConnector implements Connector,
 		ConnectorPersistentStoreAware, ConnectorShutdownAware {
 	private static final Logger LOGGER = Logger.getLogger(SharepointConnector.class.getName());
 	private SharepointClientContext sharepointClientContext = null;
-
+	private SPClientFactory clientFactory = new SPClientFactory();
 	private String sharepointUrl;
 	private String kdcserver;
 	private String domain;
@@ -103,6 +105,14 @@ public class SharepointConnector implements Connector,
 	private volatile boolean stopTraversal;
 
 	public SharepointConnector() {
+	}
+	
+	public SPClientFactory getClientFactory() {
+		return clientFactory;
+	}
+	
+	public void setClientFactory(final SPClientFactory clientFactory) {
+	    this.clientFactory = clientFactory;
 	}
 
 	public void setStopTraversal(boolean stop) {
@@ -336,9 +346,9 @@ public class SharepointConnector implements Connector,
 				+ searchBase + " ], readAdGroupsType = [" + readAdGroupsType + "] , feedUnPublishedDocuments = ["
 				+ feedUnPublishedDocuments + "]");
 
-		sharepointClientContext = new SharepointClientContext(sharepointUrl,
-				domain, kdcserver, username, password, googleConnectorWorkDir,
-				includedURls, excludedURls, mySiteBaseURL, aliasMap,
+		sharepointClientContext = new SharepointClientContext(clientFactory,
+				sharepointUrl,domain, kdcserver, username, password, 
+				googleConnectorWorkDir, includedURls, excludedURls, mySiteBaseURL, aliasMap,
 				FeedType.getFeedType(authorizationAsfeedType), useSPSearchVisibility);
 		sharepointClientContext.setFQDNConversion(FQDNConversion);
 		sharepointClientContext.setIncluded_metadata(included_metadata);
