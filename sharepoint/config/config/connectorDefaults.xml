@@ -15,6 +15,7 @@
     <property name="authorization" value="${authorization}"/>
     <property name="useSPSearchVisibility" value="${useSPSearchVisibility}"/>
     <property name="pushAcls" value="${pushAcls}"/>
+    <property name="customProperties" value="${customProperties}"/>
     <property name="usernameFormatInAce" value="${usernameFormatInAce}"/>
     <property name="groupnameFormatInAce" value="${groupnameFormatInAce}"/>
     <property name="ldapServerHostAddress" value="${ldapServerHostAddress}"/>
@@ -126,6 +127,7 @@
                 <prop key="authorization">Metadata-and-URL</prop>
                 <prop key="useSPSearchVisibility">true</prop>
                 <prop key="pushAcls">true</prop>
+		<prop key="customProperties">true</prop>
                 <prop key="usernameFormatInAce">username</prop>
                 <prop key="groupnameFormatInAce">domain\\username</prop>
                 <prop key="ldapServerHostAddress"></prop>
