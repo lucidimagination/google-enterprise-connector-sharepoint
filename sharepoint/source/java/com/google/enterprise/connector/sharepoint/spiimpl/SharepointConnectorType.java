@@ -102,6 +102,7 @@ public class SharepointConnectorType implements ConnectorType {
 	ResourceBundle rb = null;
 	public static final String GOOGLE_CONN_WORK_DIR = "googleConnectorWorkDir";
 	private String pushAcls = null;
+	private String customProperties = null;
 	private String usernameFormatInAce;
 	private String groupnameFormatInAce;
 	private String ldapServerHostAddress;
@@ -955,6 +956,8 @@ public class SharepointConnectorType implements ConnectorType {
 			useSPSearchVisibility = val.trim();
 		} else if (collator.equals(key, SPConstants.PUSH_ACLS)) {
 			this.pushAcls = val.trim();
+		} else if (collator.equals(key, SPConstants.CUSTOM_PROPERTIES)) {
+		  this.customProperties = val.trim();
 		} else if (collator.equals(key, SPConstants.USERNAME_FORMAT_IN_ACE)) {
 			this.usernameFormatInAce = val.trim();
 		} else if (collator.equals(key, SPConstants.GROUPNAME_FORMAT_IN_ACE)) {

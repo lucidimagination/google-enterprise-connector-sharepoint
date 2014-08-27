@@ -72,6 +72,7 @@ public class SharepointConnector implements Connector,
 	private String aliasMap = null;
 	private String authorizationAsfeedType = null;
 	private boolean pushAcls = true;
+	private boolean customProperties = true;
 	private String usernameFormatInAce;
 	private String groupnameFormatInAce;
 	private QueryProvider queryProvider;
@@ -357,6 +358,7 @@ public class SharepointConnector implements Connector,
 		sharepointClientContext.setUsernameFormatInAce(getUsernameFormatInAce());
 		sharepointClientContext.setGroupnameFormatInAce(this.getGroupnameFormatInAce());
 		sharepointClientContext.setPushAcls(pushAcls);
+		sharepointClientContext.setCustomProperties(customProperties);
 		sharepointClientContext.setFetchACLInBatches(this.fetchACLInBatches);
 		sharepointClientContext.setAclBatchSizeFactor(this.aclBatchSizeFactor);
 		sharepointClientContext.setWebServiceTimeOut(this.webServiceTimeOut);
@@ -400,6 +402,14 @@ public class SharepointConnector implements Connector,
 
 	public void setPushAcls(boolean pushAcls) {
 		this.pushAcls = pushAcls;
+	}
+	
+	public boolean isCustomProperties() {
+	  return customProperties;
+	}
+
+	public void setCustomProperties(boolean customProperties) {  
+	  this.customProperties = customProperties;
 	}
 
 	public boolean isUseSPSearchVisibility() {

@@ -88,6 +88,7 @@ public class SharepointClientContext implements Cloneable {
 	private TraversalContext traversalContext;
 
 	private boolean pushAcls = true;
+	private boolean customProperties = true;
 	private String usernameFormatInAce;
 	private String groupnameFormatInAce;
 
@@ -191,7 +192,8 @@ public class SharepointClientContext implements Cloneable {
 			spCl.setFQDNConversion(bFQDNConversion);
 			spCl.setBatchHint(batchHint);
 			spCl.setPushAcls(pushAcls);
-
+			spCl.setCustomProperties(customProperties);
+			
 			if (null != included_metadata) {
 				spCl.included_metadata.addAll(included_metadata);
 			}
@@ -962,6 +964,14 @@ public class SharepointClientContext implements Cloneable {
 
 	public void setPushAcls(boolean pushAcls) {
 		this.pushAcls = pushAcls;
+	}
+	
+	public void setCustomProperties(final boolean customProperties) {
+	  this.customProperties = customProperties;
+	}
+
+	public boolean isCustomProperties() {
+	  return customProperties;
 	}
 
 	public UserDataStoreDAO getUserDataStoreDAO() {

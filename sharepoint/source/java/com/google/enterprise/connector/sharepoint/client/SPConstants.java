@@ -104,7 +104,7 @@ public class SPConstants {
   public static final String VTI = "vti_";
   public static final String ENCODED_SPACE = "_x0020_";
   public static final Pattern ATTRIBUTE_VALUE_PATTERN = Pattern.compile("^\\d+;\\#");
-
+  
   public static final String UNAUTHORIZED = "(401)Unauthorized";
   public static final String SAXPARSEEXCEPTION = "org.xml.sax.SAXParseException";
 
@@ -435,6 +435,8 @@ public class SPConstants {
   public static final Object DOUBLE_CLOSE_PARENTHESIS = "))";
   public static final String PUSH_ACLS = "pushAcls";
   public static final String PUSH_ACLS_LABEL = "push_Acls";
+  public static final String CUSTOM_PROPERTIES = "customProperties";
+  public static final String CUSTOM_PROPERTIES_LABEL = "custom_properties";
   public static final String USERNAME_FORMAT_IN_ACE = "Username Format in ACE";
   public static final String GROUPNAME_FORMAT_IN_ACE = "Groupname Format in ACE";
   public static final String CONNECT_METHOD_STANDARD_HELP = "connectMethodStandard_help";
