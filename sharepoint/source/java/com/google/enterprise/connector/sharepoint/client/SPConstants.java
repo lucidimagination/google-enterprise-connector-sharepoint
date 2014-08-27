@@ -436,7 +436,7 @@ public class SPConstants {
   public static final String PUSH_ACLS = "pushAcls";
   public static final String PUSH_ACLS_LABEL = "push_Acls";
   public static final String CUSTOM_PROPERTIES = "customProperties";
-  public static final String CUSTOM_PROPERTIES_LABEL = "custom_properties";
+  public static final String CUSTOM_PROPERTIES_LABEL = "include_sharepoint_document_data";
   public static final String USERNAME_FORMAT_IN_ACE = "Username Format in ACE";
   public static final String GROUPNAME_FORMAT_IN_ACE = "Groupname Format in ACE";
   public static final String CONNECT_METHOD_STANDARD_HELP = "connectMethodStandard_help";

@@ -39,6 +39,8 @@ import com.google.enterprise.connector.sharepoint.wsclient.handlers.InvalidXmlCh
 import com.google.enterprise.connector.sharepoint.wsclient.util.DateUtil;
 import com.google.enterprise.connector.spi.SpiConstants.ActionType;
 
+import com.google.common.collect.Sets;
+
 import org.apache.axis.AxisFault;
 import org.apache.axis.message.MessageElement;
 import org.w3c.dom.Document;
@@ -60,7 +62,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Arrays;
 
 import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilder;
@@ -1773,8 +1774,8 @@ public class ListsWS {
           + doc.getUrl());
     }
     String sticky = listItem.getAttribute(SPConstants.OWS+SPConstants.METAINFO+SPConstants.VTI+"stickycachedpluggableparserprops");
-    List<String>listPropertiesDocF = new ArrayList<String>();
-
+    Set<String>listPropertiesDocF = Sets.newHashSet();
+    
     if(sticky!=null){
       listPropertiesDocF = listCustomProperties(sticky);
     }
@@ -1789,12 +1790,8 @@ public class ListsWS {
             String strAttrValue = listItem.getAttribute(strAttrName);
             // Apply the well known rules of name resolution and
             // normalizing the values
-            if(!sharepointClientContext.isCustomProperties()){
-              if (listPropertiesDocF !=null) {
-                if (listPropertiesDocF.contains(strAttrName)){
-                  continue;
-                }
-              }
+            if (!sharepointClientContext.isCustomProperties() && listPropertiesDocF !=null && listPropertiesDocF.contains(strAttrName)) {
+              continue;
             }
             strAttrName = Util.normalizeMetadataName(strAttrName);
             strAttrValue = Util.normalizeMetadataValue(strAttrValue);
@@ -1824,18 +1821,12 @@ public class ListsWS {
     return doc;
   }
 
-  private List<String> listCustomProperties (String normList) {
+  private Set<String> listCustomProperties (String normList) {
     normList =normList.replace("\\ ", SPConstants.ENCODED_SPACE);
     String []listPropertiesDoc =  normList.split(" ");
-    Iterator<String> listProperties = Arrays.asList(listPropertiesDoc).iterator();
-    List<String>listPropertiesDocF = new ArrayList<String>();
-    if (listProperties != null) {
-      while (listProperties.hasNext()) {
-        String propName = listProperties.next();
-        if (propName != null) {          
-          listPropertiesDocF.add(SPConstants.OWS+SPConstants.METAINFO+propName);
-        }
-      }
+    Set<String>listPropertiesDocF = Sets.newHashSet();
+    for(String property:listPropertiesDoc){
+      listPropertiesDocF.add(SPConstants.OWS+SPConstants.METAINFO+property);
     }
     return listPropertiesDocF;
   }
