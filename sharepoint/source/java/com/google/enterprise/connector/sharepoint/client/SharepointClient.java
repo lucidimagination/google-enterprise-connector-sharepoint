@@ -98,6 +98,8 @@ public class SharepointClient {
 
   private HashMap<String, Integer> urlVisitCount;
   private HashMap<String, String> urlToChecksum;
+  
+  private static final String SAX_FACTORY = "com.lucid.crawl.gcm.handlers.SaxErrorFactory";
 
   public SharepointClient(
       final SharepointClientContext inSharepointClientContext)
@@ -106,9 +108,11 @@ public class SharepointClient {
        // Register a SAX client factory with Axis so that we can intercept SAX
        // parsing failures. This is needed to ignore some SAX parsing failures 
        // such as duplicate attributes defined in the metadata of a document.
-       XMLUtils.initSAXFactory(
-           "com.google.enterprise.connector.sharepoint.wsclient.handlers.SaxErrorFactory",
-           true, false);
+    
+    LOGGER.fine("SAX_FACTORY: " + SAX_FACTORY);
+    
+    XMLUtils.initSAXFactory(SAX_FACTORY, true, false);
+    
     rootUrl = sharepointClientContext.getSiteURL();
     LOGGER.info("rootUrl: " + rootUrl);
   }
